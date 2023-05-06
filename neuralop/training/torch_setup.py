@@ -80,6 +80,7 @@ def setup(config):
             torch.cuda.manual_seed(seed)
         increase_l2_fetch_granularity()
         try:
+            #torch.set_float32_matmul_precision('medium')
             torch.set_float32_matmul_precision('high')
         except AttributeError:
             pass

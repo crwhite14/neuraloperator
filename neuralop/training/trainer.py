@@ -10,7 +10,7 @@ from .losses import LpLoss
 
 
 class Trainer:
-    def __init__(self, model, n_epochs, wandb_log=True, device=None,
+    def __init__(self, model, n_epochs, wandb_log=True, autocast=False, device=None,
                  mg_patching_levels=0, mg_patching_padding=0, mg_patching_stitching=True,
                  log_test_interval=1, log_output=False, use_distributed=False, verbose=True):
         """
@@ -21,6 +21,7 @@ class Trainer:
         model : nn.Module
         n_epochs : int
         wandb_log : bool, default is True
+        autocast: bool, default is False
         device : torch.device
         mg_patching_levels : int, default is 0
             if 0, no multi-grid domain decomposition is used
@@ -40,6 +41,7 @@ class Trainer:
         """
         self.n_epochs = n_epochs
         self.wandb_log = wandb_log
+        self.autocast = autocast,
         self.log_test_interval = log_test_interval
         self.log_output = log_output
         self.verbose = verbose
@@ -118,7 +120,12 @@ class Trainer:
                 if regularizer:
                     regularizer.reset()
 
-                out = model(x)
+                if self.autocast:
+                    with torch.cuda.amp.autocast():
+                        out = model(x)
+                else:
+                    out = model(x)
+
                 if epoch == 0 and idx == 0 and self.verbose and is_logger:
                     print(f'Raw outputs of size {out.shape=}')
 

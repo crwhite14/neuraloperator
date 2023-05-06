@@ -316,12 +316,25 @@ class FactorizedSpectralConv(nn.Module):
 
         fft_size = list(mode_sizes)
         fft_size[-1] = fft_size[-1]//2 + 1 # Redundant last coefficient
-        
+
         #Compute Fourier coeffcients
         fft_dims = list(range(-self.order, 0))
-        x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
 
-        out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
+        # original
+        #x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
+
+        # low precision
+        x = x.half()
+        x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
+
+        # Go back to normal precision, or else the next operation fails
+        x = x.cfloat()
+
+        # original
+        #out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
+
+        # low precision
+        out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
         
         # We contract all corners of the Fourier coefs
         # Except for the last mode: there, we take all coefs as redundant modes were already removed
