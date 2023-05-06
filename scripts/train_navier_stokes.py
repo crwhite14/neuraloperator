@@ -1,12 +1,13 @@
 import torch
 import wandb
 import sys
+import os
 from configmypy import ConfigPipeline, YamlConfig, ArgparseConfig
 from neuralop import get_model
 from neuralop import Trainer
 from neuralop.training import setup
 from neuralop.datasets.navier_stokes import load_navier_stokes_pt
-from neuralop.utils import get_wandb_api_key, count_params
+from neuralop.utils import get_wandb_api_key, count_params, get_project_root
 from neuralop import LpLoss, H1Loss
 
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -14,9 +15,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 # Read the configuration
 config_name = 'default'
-pipe = ConfigPipeline([YamlConfig('./default_config.yaml', config_name='default', config_folder='../config'),
+config_folder = os.path.join(get_project_root(), 'config')
+
+pipe = ConfigPipeline([YamlConfig('./lowprecision.yaml', config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
-                       YamlConfig(config_folder='../config')
+                       YamlConfig(config_folder=config_folder)
                       ])
 config = pipe.read_conf()
 config_name = pipe.steps[-1].config_name

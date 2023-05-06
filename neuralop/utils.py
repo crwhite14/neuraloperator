@@ -1,6 +1,8 @@
 import torch
-
+import os
 import wandb
+from pathlib import Path
+
 
 # normalization, pointwise gaussian
 class UnitGaussianNormalizer:
@@ -68,13 +70,18 @@ def count_params(model):
     return sum([p.numel()*2 if p.is_complex() else p.numel() for p in model.parameters()])
 
 
-def wandb_login(api_key_file='../config/wandb_api_key.txt'):
+def wandb_login(api_key_file=None):
+    if not api_key_file:
+        api_key_file = get_api_key_file()
+
     with open(api_key_file, 'r') as f:
         key = f.read()
     wandb.login(key=key)
 
-def set_wandb_api_key(api_key_file='../config/wandb_api_key.txt'):
-    import os
+def set_wandb_api_key(api_key_file=None):
+    if not api_key_file:
+        api_key_file = get_api_key_file()
+
     try:
         os.environ['WANDB_API_KEY']
     except KeyError:
@@ -82,11 +89,20 @@ def set_wandb_api_key(api_key_file='../config/wandb_api_key.txt'):
             key = f.read()
         os.environ['WANDB_API_KEY'] = key.strip()
 
-def get_wandb_api_key(api_key_file='../config/wandb_api_key.txt'):
-    import os
+def get_wandb_api_key(api_key_file=None):
+    if not api_key_file:
+        api_key_file = get_api_key_file()
+
     try:
         return os.environ['WANDB_API_KEY']
     except KeyError:
         with open(api_key_file, 'r') as f:
             key = f.read()
         return key.strip()
+
+def get_project_root() -> Path:
+    """Returns the root path of the project"""
+    return Path(__file__).parent.parent
+
+def get_api_key_file():
+    return os.path.join(get_project_root(), 'config/wandb_api_key.txt')
