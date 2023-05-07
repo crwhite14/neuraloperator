@@ -2,6 +2,8 @@ import torch
 import os
 import wandb
 from pathlib import Path
+import numpy as np
+import random
 
 
 # normalization, pointwise gaussian
@@ -106,3 +108,14 @@ def get_project_root() -> Path:
 
 def get_api_key_file():
     return os.path.join(get_project_root(), 'config/wandb_api_key.txt')
+
+def set_seed(seed):
+    """Set the seeds for all libraries."""
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.enabled = True
+        torch.backends.cudnn.deterministic = True
+        torch.cuda.manual_seed_all(seed)
