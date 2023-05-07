@@ -7,7 +7,7 @@ from neuralop import get_model
 from neuralop import Trainer
 from neuralop.training import setup
 from neuralop.datasets.navier_stokes import load_navier_stokes_pt
-from neuralop.utils import get_wandb_api_key, count_params, get_project_root
+from neuralop.utils import get_wandb_api_key, count_params, get_project_root, set_seed
 from neuralop import LpLoss, H1Loss
 
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -23,6 +23,10 @@ pipe = ConfigPipeline([YamlConfig('./lowprec_debug.yaml', config_name=config_nam
                       ])
 config = pipe.read_conf()
 config_name = pipe.steps[-1].config_name
+
+# Set seed
+if 'seed' in config and config.seed:
+    set_seed(config.seed)
 
 #Set-up distributed communication, if using
 device, is_logger = setup(config)
