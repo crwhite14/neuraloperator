@@ -17,7 +17,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 config_name = 'default'
 config_folder = os.path.join(get_project_root(), 'config')
 
-pipe = ConfigPipeline([YamlConfig('./lowprecision.yaml', config_name=config_name, config_folder=config_folder),
+pipe = ConfigPipeline([YamlConfig('./lowprec_debug.yaml', config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
                        YamlConfig(config_folder=config_folder)
                       ])
