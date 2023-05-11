@@ -12,6 +12,22 @@ from tltorch.factorized_tensors.core import FactorizedTensor
 
 einsum_symbols = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
+def _einsum_complex(eq, a, b):
+    """
+    Return the einsum "abxy,bcxy->acxy", but for complex tensors in half precision
+    """
+    if eq != 'abcd,becd->aecd':
+        raise NotImplementedError("Currently can only run _einsum_complex for abcd,becd->aecd, but got {}".format(eq))
+
+    a = torch.view_as_real(a)
+    b = torch.view_as_real(b)
+    b = b.half()
+
+    #tmp = tl.einsum("bixys,ioxyr->srboxy", a, b)
+    tmp = torch.einsum("bixys,ioxyr->srboxy", a, b)
+    res = torch.stack([tmp[0, 0, ...] - tmp[1, 1, ...], tmp[1, 0, ...] + tmp[0, 1, ...]], dim=-1) 
+    return torch.view_as_complex(res)
+
 def _contract_dense(x, weight, separable=False):
     order = tl.ndim(x)
     # batch-size, in_channels, x, y...
@@ -33,7 +49,10 @@ def _contract_dense(x, weight, separable=False):
     if not torch.is_tensor(weight):
         weight = weight.to_tensor()
 
-    return tl.einsum(eq, x, weight)
+    if x.dtype == torch.complex32:
+        return _einsum_complex(eq, x, weight)
+    else:
+        return tl.einsum(eq, x, weight)
 
 def _contract_dense_separable(x, weight, separable=True):
     if separable == False:
@@ -316,26 +335,22 @@ class FactorizedSpectralConv(nn.Module):
 
         fft_size = list(mode_sizes)
         fft_size[-1] = fft_size[-1]//2 + 1 # Redundant last coefficient
-
+        
         #Compute Fourier coeffcients
         fft_dims = list(range(-self.order, 0))
 
-        # original
-        #x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
+        # this causes FFT, the multiplication, and inverse FFT to be in half precision, in the forward pass
+        # todo: make this a parameter in the config file
+        fully_halfprecision = False
 
-        # low precision
-        x = x.half()
-        x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
+        if not fully_halfprecision:
+            x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
+            out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
+        else:
+            x = x.half()
+            x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
+            out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
 
-        # Go back to normal precision, or else the next operation fails
-        x = x.cfloat()
-
-        # original
-        #out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
-
-        # low precision
-        out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
-        
         # We contract all corners of the Fourier coefs
         # Except for the last mode: there, we take all coefs as redundant modes were already removed
         mode_indexing = [((None, m), (-m, None)) for m in self.half_n_modes[:-1]] + [((None, self.half_n_modes[-1]), )]
