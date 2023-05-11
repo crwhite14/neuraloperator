@@ -148,8 +148,8 @@ class Trainer:
                 else:
                     loss = training_loss(out.float(), y)
 
-                    if regularizer:
-                        loss += regularizer.loss
+                if regularizer:
+                    loss += regularizer.loss
 
                 if self.amp_autocast:
                     scaler.scale(loss).backward()
