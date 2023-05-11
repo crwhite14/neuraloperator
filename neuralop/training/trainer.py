@@ -1,4 +1,6 @@
 import torch
+from torch.cuda import amp
+from torch.cuda.amp import GradScaler
 from timeit import default_timer
 import wandb
 import sys 
@@ -10,7 +12,7 @@ from .losses import LpLoss
 
 
 class Trainer:
-    def __init__(self, model, n_epochs, wandb_log=True, autocast=False, device=None,
+    def __init__(self, model, n_epochs, wandb_log=True, amp_autocast=False, device=None,
                  mg_patching_levels=0, mg_patching_padding=0, mg_patching_stitching=True,
                  log_test_interval=1, log_output=False, use_distributed=False, verbose=True):
         """
@@ -21,7 +23,7 @@ class Trainer:
         model : nn.Module
         n_epochs : int
         wandb_log : bool, default is True
-        autocast: bool, default is False
+        amp_autocast: bool, default is False
         device : torch.device
         mg_patching_levels : int, default is 0
             if 0, no multi-grid domain decomposition is used
@@ -41,7 +43,9 @@ class Trainer:
         """
         self.n_epochs = n_epochs
         self.wandb_log = wandb_log
-        self.autocast = autocast,
+        print('setting amp_auto', amp_autocast)
+        self.amp_autocast = amp_autocast,
+        print('set amp_auto', self.amp_autocast)
         self.log_test_interval = log_test_interval
         self.log_output = log_output
         self.verbose = verbose
@@ -94,7 +98,9 @@ class Trainer:
             is_logger = (comm.get_world_rank() == 0)
         else:
             is_logger = True 
-        
+
+        scaler = GradScaler()
+
         for epoch in range(self.n_epochs):
             avg_loss = 0
             avg_lasso_loss = 0
@@ -104,7 +110,7 @@ class Trainer:
 
             for idx, sample in enumerate(train_loader):
                 x, y = sample['x'], sample['y']
-                
+
                 if epoch == 0 and idx == 0 and self.verbose and is_logger:
                     print(f'Training on raw inputs of size {x.shape=}, {y.shape=}')
 
@@ -120,31 +126,40 @@ class Trainer:
                 if regularizer:
                     regularizer.reset()
 
-                if self.autocast:
-                    with torch.cuda.amp.autocast():
+                if self.amp_autocast:
+                    with amp.autocast(enabled=True):
                         out = model(x)
                 else:
                     out = model(x)
 
-                if epoch == 0 and idx == 0 and self.verbose and is_logger:
-                    print(f'Raw outputs of size {out.shape=}')
+                    if epoch == 0 and idx == 0 and self.verbose and is_logger:
+                        print(f'Raw outputs of size {out.shape=}')
 
-                out, y = self.patcher.unpatch(out, y)
-                #Output encoding only works if output is stiched
-                if output_encoder is not None and self.mg_patching_stitching:
-                    out = output_encoder.decode(out)
-                    y = output_encoder.decode(y)
-                if epoch == 0 and idx == 0 and self.verbose and is_logger:
-                    print(f'.. Processed (unpatched) outputs of size {out.shape=}')
+                    out, y = self.patcher.unpatch(out, y)
+                    #Output encoding only works if output is stiched
+                    if output_encoder is not None and self.mg_patching_stitching:
+                        out = output_encoder.decode(out)
+                        y = output_encoder.decode(y)
+                    if epoch == 0 and idx == 0 and self.verbose and is_logger:
+                        print(f'.. Processed (unpatched) outputs of size {out.shape=}')
 
-                loss = training_loss(out.float(), y)
+                if self.amp_autocast:
+                    with amp.autocast(enabled=True):
+                        loss = training_loss(out.float(), y)
+                else:
+                    loss = training_loss(out.float(), y)
 
-                if regularizer:
-                    loss += regularizer.loss
+                    if regularizer:
+                        loss += regularizer.loss
 
-                loss.backward()
-                
-                optimizer.step()
+                if self.amp_autocast:
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    optimizer.step()
+
                 train_err += loss.item()
         
                 with torch.no_grad():

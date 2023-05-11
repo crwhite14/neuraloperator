@@ -17,7 +17,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 config_name = 'default'
 config_folder = os.path.join(get_project_root(), 'config')
 
-pipe = ConfigPipeline([YamlConfig('./lowprec_debug.yaml', config_name=config_name, config_folder=config_folder),
+pipe = ConfigPipeline([YamlConfig('./best_config.yaml', config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
                        YamlConfig(config_folder=config_folder)
                       ])
@@ -135,7 +135,7 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
                   mg_patching_padding=config.patching.padding,
                   mg_patching_stitching=config.patching.stitching,
                   wandb_log=config.wandb.log,
-                  autocast=config.opt.amp_autocast,
+                  amp_autocast=config.opt.amp_autocast,
                   log_test_interval=config.wandb.log_test_interval,
                   log_output=config.wandb.log_output,
                   use_distributed=config.distributed.use_distributed,
