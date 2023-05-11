@@ -61,10 +61,11 @@ class FNO(nn.Module):
     incremental_n_modes : None or int tuple, default is None
         * If not None, this allows to incrementally increase the number of modes in Fourier domain 
           during training. Has to verify n <= N for (n, m) in zip(incremental_n_modes, n_modes).
-        
         * If None, all the n_modes are used.
-
         This can be updated dynamically during training.
+    half_prec_fourier: True or False, default is False
+        * If True, the FFT, multiplication, and inverse FFT are done in half precision
+        * If False, these operations are done in full precision
     use_mlp : bool, optional
         Whether to use an MLP layer after each FNO block, by default False
     mlp : dict, optional
@@ -110,6 +111,7 @@ class FNO(nn.Module):
                  projection_channels=256,
                  n_layers=4,
                  incremental_n_modes=None,
+                 half_prec_fourier=False,
                  use_mlp=False, mlp=None,
                  non_linearity=F.gelu,
                  norm=None, preactivation=False,
@@ -169,6 +171,7 @@ class FNO(nn.Module):
             fno_skip=fno_skip,
             mlp_skip=mlp_skip,
             incremental_n_modes=incremental_n_modes,
+            half_prec_fourier=half_prec_fourier,
             rank=rank,
             fft_norm=fft_norm,
             fixed_rank_modes=fixed_rank_modes, 
@@ -353,10 +356,11 @@ class FNO2d(FNO):
     incremental_n_modes : None or int tuple, default is None
         * If not None, this allows to incrementally increase the number of modes in Fourier domain 
           during training. Has to verify n <= N for (n, m) in zip(incremental_n_modes, n_modes).
-        
         * If None, all the n_modes are used.
-
         This can be updated dynamically during training.
+    half_prec_fourier: True or False, default is False
+        * If True, the FFT, multiplication, and inverse FFT are done in half precision
+        * If False, these operations are done in full precision
     use_mlp : bool, optional
         Whether to use an MLP layer after each FNO block, by default False
     mlp : dict, optional
@@ -406,6 +410,7 @@ class FNO2d(FNO):
         projection_channels=256,
         n_layers=4,
         incremental_n_modes=None,
+        half_prec_fourier=False,
         non_linearity=F.gelu,
         use_mlp=False, mlp=None,
         norm=None,
@@ -433,6 +438,7 @@ class FNO2d(FNO):
             non_linearity=non_linearity,
             use_mlp=use_mlp, mlp=mlp,
             incremental_n_modes=incremental_n_modes,
+            half_prec_fourier=half_prec_fourier,
             norm=norm,
             skip=skip,
             separable=separable,

@@ -200,7 +200,7 @@ class FactorizedSpectralConv(nn.Module):
         Optionaly additional parameters to pass to the tensor decomposition
     """
     def __init__(self, in_channels, out_channels, n_modes, incremental_n_modes=None, bias=True,
-                 n_layers=1, separable=False, output_scaling_factor=None,
+                 n_layers=1, separable=False, output_scaling_factor=None, half_prec_fourier=False,
                  rank=0.5, factorization='cp', implementation='reconstructed', 
                  fixed_rank_modes=False, joint_factorization=False, decomposition_kwargs=dict(),
                  init_std='auto', fft_norm='backward'):
@@ -231,6 +231,7 @@ class FactorizedSpectralConv(nn.Module):
         self.factorization = factorization
         self.n_layers = n_layers
         self.implementation = implementation
+        self.half_prec_fourier = half_prec_fourier
 
         if output_scaling_factor is not None:
             if isinstance(output_scaling_factor, (float, int)):
@@ -339,17 +340,14 @@ class FactorizedSpectralConv(nn.Module):
         #Compute Fourier coeffcients
         fft_dims = list(range(-self.order, 0))
 
-        # this causes FFT, the multiplication, and inverse FFT to be in half precision, in the forward pass
-        # todo: make this a parameter in the config file
-        fully_halfprecision = False
-
-        if not fully_halfprecision:
-            x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
-            out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
-        else:
+        if self.half_prec_fourier:
+            # use half precision for FFT, multiplication, inverse-FFT
             x = x.half()
             x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
+        else:
+            x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
+            out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
 
         # We contract all corners of the Fourier coefs
         # Except for the last mode: there, we take all coefs as redundant modes were already removed

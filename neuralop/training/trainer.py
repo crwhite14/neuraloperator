@@ -43,9 +43,7 @@ class Trainer:
         """
         self.n_epochs = n_epochs
         self.wandb_log = wandb_log
-        print('setting amp_auto', amp_autocast)
         self.amp_autocast = amp_autocast,
-        print('set amp_auto', self.amp_autocast)
         self.log_test_interval = log_test_interval
         self.log_output = log_output
         self.verbose = verbose
@@ -99,7 +97,8 @@ class Trainer:
         else:
             is_logger = True 
 
-        scaler = GradScaler()
+        if self.amp_autocast:
+            scaler = GradScaler()
 
         for epoch in range(self.n_epochs):
             avg_loss = 0

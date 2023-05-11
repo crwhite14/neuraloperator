@@ -17,19 +17,20 @@ default: &DEFAULT
   # FNO related
   tfno2d:
     data_channels: 3
-    modes_height: 64
-    modes_width: 64
     n_modes_height: 64
     n_modes_width: 64
-    width: 64
-    fc_channels: 256
     hidden_channels: 64
+    out_channels: 1
+    lifting_channels: 256
+    projection_channels: 256
+    incremental_n_modes: None
     n_layers: 4
     domain_padding: None #0.078125
     domain_padding_mode: 'one-sided'
     fft_norm: 'forward'
     norm: 'group_norm'
     skip: 'linear'
+    half_prec_fourier: False
 
     use_mlp: 1
     mlp:
@@ -38,7 +39,7 @@ default: &DEFAULT
 
     separable: 0
     preactivation: 0
-    factorization: 'cp' #None #'cp'
+    factorization: None #'cp' in best
     joint_factorization: 0
     rank: 0.05
     fixed_rank_modes: False
@@ -85,7 +86,7 @@ default: &DEFAULT
 
   # Weights and biases
   wandb:
-    log: False
+    log: True
     name: None # If None, config will be used but you can override it here
     group: 'neuraloperator' 
     project: "lowprecision"
