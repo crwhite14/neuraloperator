@@ -1,18 +1,22 @@
 
 import torch
 import time
+import os
 from tensorly import tenalg
 tenalg.set_backend('einsum')
 
 from configmypy import ConfigPipeline, YamlConfig, ArgparseConfig
 from neuralop import get_model
+from neuralop.utils import get_project_root
 
 
 # Read the configuration
 config_name = 'default'
-pipe = ConfigPipeline([YamlConfig('./test_config.yaml', config_name='default', config_folder='../config'),
+config_folder = os.path.join(get_project_root(), 'config')
+
+pipe = ConfigPipeline([YamlConfig('./test_config.yaml', config_name='default', config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
-                       YamlConfig(config_folder='../config')
+                       YamlConfig(config_folder=config_folder)
                       ])
 config = pipe.read_conf()
 config_name = pipe.steps[-1].config_name
