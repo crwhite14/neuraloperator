@@ -43,7 +43,7 @@ class Trainer:
         """
         self.n_epochs = n_epochs
         self.wandb_log = wandb_log
-        self.amp_autocast = amp_autocast,
+        self.amp_autocast = amp_autocast
         self.log_test_interval = log_test_interval
         self.log_output = log_output
         self.verbose = verbose
@@ -97,8 +97,8 @@ class Trainer:
         else:
             is_logger = True 
 
-        if self.amp_autocast:
-            scaler = GradScaler()
+        #if self.amp_autocast:
+        #    scaler = GradScaler()
 
         for epoch in range(self.n_epochs):
             avg_loss = 0
@@ -131,16 +131,16 @@ class Trainer:
                 else:
                     out = model(x)
 
-                    if epoch == 0 and idx == 0 and self.verbose and is_logger:
-                        print(f'Raw outputs of size {out.shape=}')
+                if epoch == 0 and idx == 0 and self.verbose and is_logger:
+                    print(f'Raw outputs of size {out.shape=}')
 
-                    out, y = self.patcher.unpatch(out, y)
-                    #Output encoding only works if output is stiched
-                    if output_encoder is not None and self.mg_patching_stitching:
-                        out = output_encoder.decode(out)
-                        y = output_encoder.decode(y)
-                    if epoch == 0 and idx == 0 and self.verbose and is_logger:
-                        print(f'.. Processed (unpatched) outputs of size {out.shape=}')
+                out, y = self.patcher.unpatch(out, y)
+                #Output encoding only works if output is stiched
+                if output_encoder is not None and self.mg_patching_stitching:
+                    out = output_encoder.decode(out)
+                    y = output_encoder.decode(y)
+                if epoch == 0 and idx == 0 and self.verbose and is_logger:
+                    print(f'.. Processed (unpatched) outputs of size {out.shape=}')
 
                 if self.amp_autocast:
                     with amp.autocast(enabled=True):
@@ -151,13 +151,15 @@ class Trainer:
                 if regularizer:
                     loss += regularizer.loss
 
-                if self.amp_autocast:
-                    scaler.scale(loss).backward()
-                    scaler.step(optimizer)
-                    scaler.update()
-                else:
-                    loss.backward()
-                    optimizer.step()
+                #if self.amp_autocast:
+                #    scaler.scale(loss).backward()
+                #    scaler.step(optimizer)
+                #    scaler.update()
+                #else:
+                #    loss.backward()
+                #    optimizer.step()
+                loss.backward()
+                optimizer.step()
 
                 train_err += loss.item()
         
