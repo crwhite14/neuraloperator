@@ -12,7 +12,7 @@ from .losses import LpLoss
 
 
 class Trainer:
-    def __init__(self, model, n_epochs, wandb_log=True, amp_autocast=False, device=None,
+    def __init__(self, model, n_epochs, wandb_log=True, amp_autocast=False, grad_clip=False, device=None,
                  mg_patching_levels=0, mg_patching_padding=0, mg_patching_stitching=True,
                  log_test_interval=1, log_output=False, use_distributed=False, verbose=True):
         """
@@ -24,6 +24,9 @@ class Trainer:
         n_epochs : int
         wandb_log : bool, default is True
         amp_autocast: bool, default is False
+        grad_clip: float
+            if 0/False, no gradient clipping is done
+            if > 0, indicates the maximum allowed norm of the gradients
         device : torch.device
         mg_patching_levels : int, default is 0
             if 0, no multi-grid domain decomposition is used
@@ -44,6 +47,7 @@ class Trainer:
         self.n_epochs = n_epochs
         self.wandb_log = wandb_log
         self.amp_autocast = amp_autocast
+        self.grad_clip = grad_clip
         self.log_test_interval = log_test_interval
         self.log_output = log_output
         self.verbose = verbose
@@ -151,6 +155,7 @@ class Trainer:
                 if regularizer:
                     loss += regularizer.loss
 
+                # todo: probably make a flag to separately turn on grad scaling
                 #if self.amp_autocast:
                 #    scaler.scale(loss).backward()
                 #    scaler.step(optimizer)
@@ -159,6 +164,8 @@ class Trainer:
                 #    loss.backward()
                 #    optimizer.step()
                 loss.backward()
+                if self.grad_clip:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=self.grad_clip)
                 optimizer.step()
 
                 train_err += loss.item()
