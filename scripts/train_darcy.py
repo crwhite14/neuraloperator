@@ -1,12 +1,13 @@
 import torch
 import wandb
 import sys
+import os
 from configmypy import ConfigPipeline, YamlConfig, ArgparseConfig
 from neuralop import get_model
 from neuralop import Trainer
 from neuralop.training import setup
-from neuralop.datasets import load_darcy_flow_small
-from neuralop.utils import get_wandb_api_key, count_params
+from neuralop.datasets import load_darcy_flow_small, load_darcy_pt
+from neuralop.utils import get_wandb_api_key, count_params, get_project_root, set_seed
 from neuralop import LpLoss, H1Loss
 
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -14,12 +15,18 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 # Read the configuration
 config_name = 'default'
-pipe = ConfigPipeline([YamlConfig('./darcy_config.yaml', config_name='default', config_folder='../config'),
+config_folder = os.path.join(get_project_root(), 'config')
+
+pipe = ConfigPipeline([YamlConfig('./darcy_config.yaml', config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
-                       YamlConfig(config_folder='../config')
+                       YamlConfig(config_folder=config_folder)
                       ])
 config = pipe.read_conf()
 config_name = pipe.steps[-1].config_name
+
+# Set seed
+if 'seed' in config and config.seed:
+    set_seed(config.seed)
 
 #Set-up distributed communication, if using
 device, is_logger = setup(config)
@@ -53,13 +60,22 @@ if config.verbose and is_logger:
     pipe.log()
     sys.stdout.flush()
 
-# Loading the Navier-Stokes dataset in 128x128 resolution
-train_loader, test_loaders, output_encoder = load_darcy_flow_small(
+if config.data.train_resolution == 16:
+    # Loading the Darcy dataset in 16x16 resolution
+    train_loader, test_loaders, output_encoder = load_darcy_flow_small(
         n_train=config.data.n_train, batch_size=config.data.batch_size, 
         positional_encoding=config.data.positional_encoding,
         test_resolutions=config.data.test_resolutions, n_tests=config.data.n_tests, test_batch_sizes=config.data.test_batch_sizes,
         encode_input=config.data.encode_input, encode_output=config.data.encode_output,
         )
+else:
+    # Loading the Darcy dataset in higher resolution
+    train_loader, test_loaders, output_encoder = load_darcy_pt(data_path='/home/ubuntu/data/darcy_flow',
+            n_train=config.data.n_train, batch_size=config.data.batch_size, 
+            positional_encoding=config.data.positional_encoding,
+            test_resolutions=config.data.test_resolutions, n_tests=config.data.n_tests, test_batch_sizes=config.data.test_batch_sizes,
+            encode_input=config.data.encode_input, encode_output=config.data.encode_output,
+            )
 
 model = get_model(config)
 model = model.to(device)
@@ -133,6 +149,7 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
                   mg_patching_padding=config.patching.padding,
                   mg_patching_stitching=config.patching.stitching,
                   wandb_log=config.wandb.log,
+                  amp_autocast=config.opt.amp_autocast,
                   log_test_interval=config.wandb.log_test_interval,
                   log_output=config.wandb.log_output,
                   use_distributed=config.distributed.use_distributed,
