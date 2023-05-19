@@ -79,3 +79,10 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+*.pt
+wandb/
+*.ncu-rep
+scripts/forward_log
+scripts/halfprec_log
+config/best_config_renbo.yaml

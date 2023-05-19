@@ -9,6 +9,7 @@ import neuralop.mpu.comm as comm
 
 from .patching import MultigridPatching2D
 from .losses import LpLoss
+from .utils import AverageMeter, get_gpu_total_mem, get_gpu_usage
 
 
 class Trainer:
@@ -104,12 +105,20 @@ class Trainer:
         #if self.amp_autocast:
         #    scaler = GradScaler()
 
+        GPU_memory_meter_macro = AverageMeter()
+        GPU_util_meter_macro = AverageMeter()
+        gpu_mem_capacity = get_gpu_total_mem()
+        time_meter = AverageMeter()
+        measure_gpu = True
+
         for epoch in range(self.n_epochs):
             avg_loss = 0
             avg_lasso_loss = 0
             model.train()
             t1 = default_timer()
             train_err = 0.0
+            GPU_memory_meter_micro = AverageMeter()
+            GPU_util_meter_micro = AverageMeter()
 
             for idx, sample in enumerate(train_loader):
                 x, y = sample['x'], sample['y']
@@ -135,6 +144,12 @@ class Trainer:
                 else:
                     out = model(x)
 
+                #first measurement
+                if measure_gpu:
+                    gpu_mem_used, _ , gpu_util = get_gpu_usage()
+                    GPU_memory_meter_micro.update(gpu_mem_used)
+                    GPU_util_meter_micro.update(gpu_util)
+
                 if epoch == 0 and idx == 0 and self.verbose and is_logger:
                     print(f'Raw outputs of size {out.shape=}')
 
@@ -152,6 +167,12 @@ class Trainer:
                 else:
                     loss = training_loss(out.float(), y)
 
+                #second measurement
+                if measure_gpu:
+                    gpu_mem_used, _ , gpu_util = get_gpu_usage()
+                    GPU_memory_meter_micro.update(gpu_mem_used)
+                    GPU_util_meter_micro.update(gpu_util)
+
                 if regularizer:
                     loss += regularizer.loss
 
@@ -164,6 +185,13 @@ class Trainer:
                 #    loss.backward()
                 #    optimizer.step()
                 loss.backward()
+
+                #third measurement
+                if measure_gpu:
+                    gpu_mem_used, _ , gpu_util = get_gpu_usage()
+                    GPU_memory_meter_micro.update(gpu_mem_used)
+                    GPU_util_meter_micro.update(gpu_util)
+
                 if self.grad_clip:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=self.grad_clip)
                 optimizer.step()
@@ -181,6 +209,10 @@ class Trainer:
                 scheduler.step()
 
             epoch_train_time = default_timer() - t1
+            time_meter.update(epoch_train_time)
+            GPU_memory_meter_macro.update(GPU_memory_meter_micro.avg)
+            GPU_util_meter_macro.update(GPU_util_meter_micro.avg)
+
             del x, y
 
             train_err/= n_train
@@ -189,6 +221,7 @@ class Trainer:
             if epoch % self.log_test_interval == 0: 
                 
                 msg = f'[{epoch}] time={epoch_train_time:.2f}, avg_loss={avg_loss:.4f}, train_err={train_err:.4f}'
+                msg_info = f'avg epoch time={time_meter.avg:.2f}, avg_gpu_mem/all_gpu_mem={GPU_memory_meter_macro.avg:.2f}/{gpu_mem_capacity:.2f}(GB), avg_gpu_util={GPU_util_meter_macro.avg:.2f}%'
 
                 values_to_log = dict(train_err=train_err, time=epoch_train_time, avg_loss=avg_loss)
 
@@ -210,6 +243,7 @@ class Trainer:
 
                 if self.verbose and is_logger:
                     print(msg)
+                    print(msg_info)
                     sys.stdout.flush()
 
                 # Wandb loging
