@@ -10,10 +10,23 @@ use_opt_einsum('optimal')
 
 from tltorch.factorized_tensors.core import FactorizedTensor
 
-from .einsum_utils import einsum_complexhalf
-
 einsum_symbols = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
+def _einsum_complex(eq, a, b):
+    """
+    Return the einsum "abxy,bcxy->acxy", but for complex tensors in half precision
+    """
+    if eq != 'abcd,becd->aecd':
+        raise NotImplementedError("Currently can only run _einsum_complex for abcd,becd->aecd, but got {}".format(eq))
+
+    a = torch.view_as_real(a)
+    b = torch.view_as_real(b)
+    b = b.half()
+
+    #tmp = tl.einsum("bixys,ioxyr->srboxy", a, b)
+    tmp = torch.einsum("bixys,ioxyr->srboxy", a, b)
+    res = torch.stack([tmp[0, 0, ...] - tmp[1, 1, ...], tmp[1, 0, ...] + tmp[0, 1, ...]], dim=-1) 
+    return torch.view_as_complex(res)
 
 def _contract_dense(x, weight, separable=False):
     order = tl.ndim(x)
@@ -37,7 +50,7 @@ def _contract_dense(x, weight, separable=False):
         weight = weight.to_tensor()
 
     if x.dtype == torch.complex32:
-        return einsum_complexhalf(eq, x, weight)
+        return _einsum_complex(eq, x, weight)
     else:
         return tl.einsum(eq, x, weight)
 
@@ -61,10 +74,7 @@ def _contract_cp(x, cp_weight, separable=False):
     factor_syms += [xs+rank_sym for xs in x_syms[2:]] #x, y, ...
     eq = x_syms + ',' + rank_sym + ',' + ','.join(factor_syms) + '->' + ''.join(out_syms)
 
-    if x.dtype == torch.complex32:
-        return einsum_complexhalf(eq, x, cp_weight.weights, *cp_weight.factors)
-    else:
-        return tl.einsum(eq, x, cp_weight.weights, *cp_weight.factors)
+    return tl.einsum(eq, x, cp_weight.weights, *cp_weight.factors)
  
 
 def _contract_tucker(x, tucker_weight, separable=False):
