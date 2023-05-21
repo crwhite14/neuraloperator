@@ -15,9 +15,13 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 # Read the configuration
 config_name = 'default'
-config_folder = os.path.join(get_project_root(), 'config')
+#config_folder = os.path.join(get_project_root(), 'config')
+config_folder = os.path.join('..', 'config')
 
-pipe = ConfigPipeline([YamlConfig('./best_config.yaml', config_name=config_name, config_folder=config_folder),
+config_file_name = 'best_config_renbo.yaml'
+#config_file_name = 'ablation_config.yaml'
+
+pipe = ConfigPipeline([YamlConfig(config_file_name, config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
                        YamlConfig(config_folder=config_folder)
                       ])
@@ -33,7 +37,7 @@ device, is_logger = setup(config)
 
 #Set up WandB logging
 if config.wandb.log and is_logger:
-    wandb.login(key=get_wandb_api_key())
+    #wandb.login(key=get_wandb_api_key())
     if config.wandb.name:
         wandb_name = config.wandb.name
     else:
@@ -66,6 +70,42 @@ train_loader, test_loaders, output_encoder = load_navier_stokes_pt(
 
 model = get_model(config)
 model = model.to(device)
+
+'''
+from collections import OrderedDict
+
+activations = OrderedDict()
+def forward_hook(module, input, output):
+    module_key = f"{module.__class__.__name__}_{id(module)}"
+    activations[module_key] = input
+    if torch.isnan(output).any():
+        print(f'Got NaN in {module}')
+        for key in activations.keys():
+            print(key, activations[key][0].shape, torch.max(activations[key][0]), torch.min(activations[key][0]))
+        raise ValueError('NaN in output')
+
+for module in model.modules():
+    module.register_forward_hook(forward_hook)
+
+
+def hook_fn_forward(module, input, output):
+    if torch.isnan(input[0]).any():
+        print('Input contains NaN values')
+    if torch.isnan(output).any():
+        print('Output contains NaN values')
+
+def hook_fn_backward(module, grad_input, grad_output):
+    for g in grad_input:
+        if g is not None:
+            if torch.isnan(g).any():
+                print('Grad Input contains NaN values')
+    if any(torch.isnan(g).any() for g in grad_output):
+        print('Grad Output contains NaN values')
+
+conv_layer = model.lifting.fc
+conv_layer.register_forward_hook(hook_fn_forward)
+conv_layer.register_backward_hook(hook_fn_backward)
+'''
 
 #Use distributed data parallel 
 if config.distributed.use_distributed:

@@ -12,7 +12,7 @@ from neuralop import get_model, H1Loss
 # Read the configuration
 config_name = 'default'
 #config_path = Path(__file__).parent.as_posix()
-pipe = ConfigPipeline([YamlConfig('./best_config.yaml', config_name='default', config_folder='../config'),
+pipe = ConfigPipeline([YamlConfig('./best_config_full.yaml', config_name='default', config_folder='../config'),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
                        YamlConfig(config_folder='../config')
                       ])
