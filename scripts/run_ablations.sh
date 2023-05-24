@@ -12,7 +12,7 @@
 #python train_navier_stokes.py --wandb.name=NS-10k-half-only --tfno2d.half_prec_fourier=True
 
 #both amp and half precision fourier without modifications
-#python train_navier_stokes.py --wandb.name=NS-10k-amp+half --tfno2d.half_prec_fourier=True --opt.amp_autocast=True
+python train_navier_stokes.py --wandb.name=NS-10k-amp+half_preact --tfno2d.half_prec_fourier=True --opt.amp_autocast=True
 
 #both amp and half precision fourier with full-precision rfft
 #python train_navier_stokes.py --wandb.name=NS-10k-amp+half-full-rfft --tfno2d.stabilizer='full_fft'  --tfno2d.half_prec_fourier=True --opt.amp_autocast=True

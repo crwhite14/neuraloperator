@@ -30,6 +30,7 @@ config_name = pipe.steps[-1].config_name
 
 # Set seed
 if 'seed' in config and config.seed:
+    print('setting seed to', config.seed)
     set_seed(config.seed)
 
 #Set-up distributed communication, if using

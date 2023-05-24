@@ -86,3 +86,6 @@ wandb/
 scripts/forward_log
 scripts/halfprec_log
 config/best_config_renbo.yaml
+*.png 
+*.pdf
+*.zip
