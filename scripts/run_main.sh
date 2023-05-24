@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Run ablations experiments for the paper
-
 #regular FNO 
 #python train_navier_stokes.py --wandb.name=NS-10k-regular-main 
 

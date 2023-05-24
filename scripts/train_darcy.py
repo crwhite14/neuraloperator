@@ -15,7 +15,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 # Read the configuration
 config_name = 'default'
-config_folder = os.path.join(get_project_root(), 'config')
+#config_folder = os.path.join(get_project_root(), 'config')
+config_folder = os.path.join('..', 'config')
 
 pipe = ConfigPipeline([YamlConfig('./darcy_config.yaml', config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
@@ -33,7 +34,7 @@ device, is_logger = setup(config)
 
 #Set up WandB logging
 if config.wandb.log and is_logger:
-    wandb.login(key=get_wandb_api_key())
+    #wandb.login(key=get_wandb_api_key())
     if config.wandb.name:
         wandb_name = config.wandb.name
     else:
@@ -70,9 +71,10 @@ if config.data.train_resolution == 16:
         )
 else:
     # Loading the Darcy dataset in higher resolution
-    train_loader, test_loaders, output_encoder = load_darcy_pt(data_path='/home/ubuntu/data/darcy_flow',
+    train_loader, test_loaders, output_encoder = load_darcy_pt(data_path=config.data.folder,
             n_train=config.data.n_train, batch_size=config.data.batch_size, 
             positional_encoding=config.data.positional_encoding,
+            train_resolution=config.data.train_resolution,
             test_resolutions=config.data.test_resolutions, n_tests=config.data.n_tests, test_batch_sizes=config.data.test_batch_sizes,
             encode_input=config.data.encode_input, encode_output=config.data.encode_output,
             )
