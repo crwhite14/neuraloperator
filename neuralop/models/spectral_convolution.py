@@ -232,7 +232,7 @@ class FactorizedSpectralConv(nn.Module):
         self.n_layers = n_layers
         self.implementation = implementation
         self.half_prec_fourier = half_prec_fourier
-        if stabilizer is not None and stabilizer not in ['full_fft', 'clip_hard', 'clip_sigma', 'interpolation', 'tanh']:
+        if stabilizer is not None and stabilizer not in ['full_fft', 'clip_hard', 'clip_sigma', 'interpolation', 'tanh', 'div_by_mil']:
             raise ValueError(f'Got {stabilizer=}, expected None, "full_fft", "clip_hard", "clip_sigma" or "interpolation"')
         self.stabilizer = stabilizer 
 
@@ -366,6 +366,11 @@ class FactorizedSpectralConv(nn.Module):
             elif self.stabilizer == 'tanh':
                 x = x.half()
                 x = torch.tanh(x)
+                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
+
+            elif self.stabilizer == 'div_by_mil':
+                x = x.half()
+                x = x / 1e6
                 x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
                 
             elif self.stabilizer == 'interpolation':
