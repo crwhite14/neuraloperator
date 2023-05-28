@@ -42,7 +42,7 @@ default: &DEFAULT
     preactivation: 0
     factorization: 'cp' #'cp' in best
     joint_factorization: 0
-    rank: 1024 #0.05
+    rank: 0.05
     fixed_rank_modes: False
     implementation: 'factorized'
 
@@ -66,7 +66,7 @@ default: &DEFAULT
     # folder: '/home/nikola/HDD/NavierStokes/2D'
     folder: '/home/ubuntu/data/navier_stokes/'
     # folder: '/data'
-    batch_size: 16
+    batch_size: 64
     n_train: 10000
     train_resolution: 128
     n_tests: [2000] #, 1000]
@@ -88,7 +88,7 @@ default: &DEFAULT
 
   # Weights and biases
   wandb:
-    log: False
+    log: True
     name: None # If None, config will be used but you can override it here
     group: 'neuraloperator' 
     project: "lowprecision"
