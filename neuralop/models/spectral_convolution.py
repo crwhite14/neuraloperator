@@ -348,7 +348,11 @@ class FactorizedSpectralConv(nn.Module):
 
         x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
 
-        if self.half_prec_fourier or self.half_prec_inverse:
+        if self.half_prec_inverse:
+            # if self.half_prec_fourier, x is already chalf
+            x = x.chalf()
+
+        if self.half_prec_inverse or self.half_prec_fourier:
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
         else:
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
