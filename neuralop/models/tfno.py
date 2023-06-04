@@ -65,7 +65,8 @@ class FNO(nn.Module):
         This can be updated dynamically during training.
     half_prec_fourier: True or False, default is False
         * If True, the FFT, multiplication, and inverse FFT are done in half precision
-        * If False, these operations are done in full precision
+    half_prec_inverse: True or False, default is False
+        * If True, the multiplication and inverse FFT are done in half precision
     use_mlp : bool, optional
         Whether to use an MLP layer after each FNO block, by default False
     mlp : dict, optional
@@ -112,6 +113,7 @@ class FNO(nn.Module):
                  n_layers=4,
                  incremental_n_modes=None,
                  half_prec_fourier=False,
+                 half_prec_inverse=False,
                  stabilizer=None,
                  use_mlp=False, mlp=None,
                  non_linearity=F.gelu,
@@ -173,6 +175,7 @@ class FNO(nn.Module):
             mlp_skip=mlp_skip,
             incremental_n_modes=incremental_n_modes,
             half_prec_fourier=half_prec_fourier,
+            half_prec_inverse=half_prec_inverse,
             stabilizer=stabilizer,
             rank=rank,
             fft_norm=fft_norm,
@@ -217,12 +220,12 @@ class FNO(nn.Module):
 
     @property
     def fourier_precision(self):
-        return (self.fno_blocks.convs.half_prec_fourier, self.fno_blocks.convs.stabilizer)
+        return (self.fno_blocks.convs.half_prec_fourier, self.fno_blocks.convs.half_prec_inverse)
 
     @fourier_precision.setter
     def fourier_precision(self, fourier_precision):
         self.fno_blocks.convs.half_prec_fourier = fourier_precision[0]
-        self.fno_blocks.convs.stabilizer = fourier_precision[1]
+        self.fno_blocks.convs.half_prec_inverse = fourier_precision[1]
 
 class FNO1d(FNO):
     """1D Fourier Neural Operator
@@ -370,7 +373,8 @@ class FNO2d(FNO):
         This can be updated dynamically during training.
     half_prec_fourier: True or False, default is False
         * If True, the FFT, multiplication, and inverse FFT are done in half precision
-        * If False, these operations are done in full precision
+    half_prec_inverse: True or False, default is False
+        * If True, then multiplication and inverse FFT are done in half precision
     use_mlp : bool, optional
         Whether to use an MLP layer after each FNO block, by default False
     mlp : dict, optional
@@ -421,6 +425,7 @@ class FNO2d(FNO):
         n_layers=4,
         incremental_n_modes=None,
         half_prec_fourier=False,
+        half_prec_inverse=False,
         stabilizer=None,
         non_linearity=F.gelu,
         use_mlp=False, mlp=None,
@@ -450,6 +455,7 @@ class FNO2d(FNO):
             use_mlp=use_mlp, mlp=mlp,
             incremental_n_modes=incremental_n_modes,
             half_prec_fourier=half_prec_fourier,
+            half_prec_inverse=half_prec_inverse,
             stabilizer=stabilizer,
             norm=norm,
             skip=skip,

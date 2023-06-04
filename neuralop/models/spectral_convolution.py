@@ -191,7 +191,7 @@ class FactorizedSpectralConv(nn.Module):
                  n_layers=1, separable=False, output_scaling_factor=None, half_prec_fourier=False,
                  stabilizer=None, rank=0.5, factorization='cp', implementation='reconstructed', 
                  fixed_rank_modes=False, joint_factorization=False, decomposition_kwargs=dict(),
-                 init_std='auto', fft_norm='backward'):
+                 init_std='auto', fft_norm='backward', half_prec_inverse=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -220,6 +220,7 @@ class FactorizedSpectralConv(nn.Module):
         self.n_layers = n_layers
         self.implementation = implementation
         self.half_prec_fourier = half_prec_fourier
+        self.half_prec_inverse = half_prec_inverse
         if stabilizer is not None and stabilizer not in ['full_fft', 'clip_hard', 'clip_sigma', 'interpolation', 'tanh', 'div_by_mil']:
             raise ValueError(f'Got {stabilizer=}, expected None, "full_fft", "clip_hard", "clip_sigma" or "interpolation"')
         self.stabilizer = stabilizer 
@@ -332,44 +333,24 @@ class FactorizedSpectralConv(nn.Module):
         fft_dims = list(range(-self.order, 0))
 
         if self.half_prec_fourier:
-            # use half precision for FFT, multiplication, inverse-FFT
-            if self.stabilizer is None:
-                x = x.half()
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
+            x = x.half()
+        else:
+            x.float()
 
-            elif self.stabilizer == 'full_fft':
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-                x = x.chalf()
+        if self.stabilizer == 'tanh':
+            x = torch.tanh(x)
+        elif self.stabilizer == 'clip_hard':
+            x = torch.clamp(x, -1, 1) 
+        elif self.stabilizer == 'clip_sigma':
+            x = self.sigma_clip(x)
+        elif self.stabilizer:
+            raise ValueError(f'Unknown stabilizer {self.stabilizer}')
 
-            elif self.stabilizer == 'clip_hard':
-                x = x.half()
-                x = torch.clamp(x, -1, 1)
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-            
-            elif self.stabilizer == 'clip_sigma':
-                x = x.half()
-                x = self.sigma_clip(x)
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
+        x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
 
-            elif self.stabilizer == 'tanh':
-                x = x.half()
-                x = torch.tanh(x)
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-
-            elif self.stabilizer == 'div_by_mil':
-                x = x.half()
-                x = x / 1e6
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-                
-            elif self.stabilizer == 'interpolation':
-                raise NotImplementedError('Interpolation is not implemented yet')
-
-            else:
-                raise ValueError(f'Unknown stabilizer {self.stabilizer}')
-
+        if self.half_prec_fourier or self.half_prec_inverse:
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
         else:
-            x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
 
         # We contract all corners of the Fourier coefs

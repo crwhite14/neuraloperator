@@ -12,6 +12,7 @@ class FNOBlocks(nn.Module):
                  n_layers=1,
                  incremental_n_modes=None,
                  half_prec_fourier=False,
+                 half_prec_inverse=False,
                  stabilizer=None,
                  use_mlp=False, mlp=None,
                  non_linearity=F.gelu,
@@ -41,6 +42,7 @@ class FNOBlocks(nn.Module):
 
         self._incremental_n_modes = incremental_n_modes
         self.half_prec_fourier = half_prec_fourier
+        self.half_prec_inverse = half_prec_inverse
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.n_layers = n_layers
@@ -62,6 +64,7 @@ class FNOBlocks(nn.Module):
                 output_scaling_factor=output_scaling_factor,
                 incremental_n_modes=incremental_n_modes,
                 half_prec_fourier=half_prec_fourier,
+                half_prec_inverse=half_prec_inverse,
                 stabilizer=stabilizer,
                 rank=rank,
                 fft_norm=fft_norm,

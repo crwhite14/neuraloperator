@@ -18,8 +18,7 @@ config_name = 'default'
 #config_folder = os.path.join(get_project_root(), 'config')
 config_folder = os.path.join('..', 'config')
 
-config_file_name = 'best_config_renbo.yaml'
-#config_file_name = 'ablation_config.yaml'
+config_file_name = 'factorized_config.yaml'
 
 pipe = ConfigPipeline([YamlConfig(config_file_name, config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
@@ -178,6 +177,7 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
                   wandb_log=config.wandb.log,
                   amp_autocast=config.opt.amp_autocast,
                   grad_clip=config.opt.grad_clip,
+                  precision_schedule=config.opt.precision_schedule,
                   log_test_interval=config.wandb.log_test_interval,
                   log_output=config.wandb.log_output,
                   use_distributed=config.distributed.use_distributed,

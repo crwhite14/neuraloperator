@@ -51,8 +51,15 @@ class Trainer:
         self.wandb_log = wandb_log
         self.amp_autocast = amp_autocast
         self.grad_clip = grad_clip
-        # todo: fix the error with yaml casting to array
-        self.precision_schedule = [int(x) for x in list(precision_schedule)]
+        # todo: currently setting an argument of array as ints is not working, neither in yaml file or as command line arg
+        if precision_schedule:
+            try:
+                self.precision_schedule = [int(x) for x in list(precision_schedule)]
+            except:
+                self.precision_schedule = [int(x) for x in ''.join(precision_schedule)[1:-1].split(',')]
+        else:
+            self.precision_schedule = None
+
         self.log_test_interval = log_test_interval
         self.log_output = log_output
         self.verbose = verbose
@@ -202,20 +209,6 @@ class Trainer:
             else:
                 scheduler.step()
 
-            if self.precision_schedule and epoch in self.precision_schedule:
-                # todo: currently hard-coded for a schedule of tanh, full_fft, full
-                # todo: also currently needs starting half_prec_fourier=True and stabilizer='tanh'
-                stabilizer = model.fourier_precision
-                if stabilizer[0] and stabilizer[1] == 'tanh':
-                    stabilizer = (True, 'full_fft')
-                    model.fourier_precision = stabilizer
-                    print('set half_prec_fourier:', model.fno_blocks.convs.half_prec_fourier, 'stabilizer:',model.fno_blocks.convs.stabilizer, 'amp', self.amp_autocast)
-                elif stabilizer[0] and stabilizer[1] == 'full_fft':
-                    stabilizer = (False, None)
-                    model.fourier_precision = stabilizer
-                    self.amp_autocast = False
-                    print('set half_prec_fourier:', model.fno_blocks.convs.half_prec_fourier, 'stabilizer:',model.fno_blocks.convs.stabilizer, 'amp', self.amp_autocast)
-
             epoch_train_time = default_timer() - t1
             time_meter.update(epoch_train_time)
             GPU_memory_meter_macro.update(GPU_memory_meter_micro.avg)
@@ -260,6 +253,20 @@ class Trainer:
                         lr = pg['lr']
                         values_to_log['lr'] = lr
                     wandb.log(values_to_log, step=epoch, commit=True)
+
+            if self.precision_schedule and epoch in self.precision_schedule:
+                # todo: currently hard-coded for a schedule of half_prec_fourier, half_prec_inverse, full-precision
+                # todo: also currently needs starting half_prec_fourier=True and stabilizer='tanh'
+                fourier_precision = model.fourier_precision
+                if fourier_precision[0]:
+                    fourier_precision = (False, True)
+                    model.fourier_precision = fourier_precision
+                    print('set half_prec_fourier:', model.fno_blocks.convs.half_prec_fourier, 'half_prec_inverse:',model.fno_blocks.convs.half_prec_inverse, 'amp', self.amp_autocast)
+                elif fourier_precision[1]:
+                    fourier_precision = (False, False)
+                    model.fourier_precision = fourier_precision
+                    self.amp_autocast = False
+                    print('set half_prec_fourier:', model.fno_blocks.convs.half_prec_fourier, 'half_prec_inverse:',model.fno_blocks.convs.half_prec_inverse, 'amp', self.amp_autocast)
 
     def evaluate(self, model, loss_dict, data_loader, output_encoder=None,
                  log_prefix=''):
