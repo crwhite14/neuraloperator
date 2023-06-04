@@ -14,7 +14,7 @@ from .utils import AverageMeter, get_gpu_total_mem, get_gpu_usage
 
 class Trainer:
     def __init__(self, model, n_epochs, wandb_log=True, amp_autocast=False, grad_clip=False, device=None,
-                 mg_patching_levels=0, mg_patching_padding=0, mg_patching_stitching=True,
+                 mg_patching_levels=0, mg_patching_padding=0, mg_patching_stitching=True, precision_schedule=None,
                  log_test_interval=1, log_output=False, use_distributed=False, verbose=True):
         """
         A general Trainer class to train neural-operators on given datasets
@@ -28,6 +28,8 @@ class Trainer:
         grad_clip: float
             if 0/False, no gradient clipping is done
             if > 0, indicates the maximum allowed norm of the gradients
+        precision_schedule: array of ints
+            sets Fourier layer precision to half, mixed, full
         device : torch.device
         mg_patching_levels : int, default is 0
             if 0, no multi-grid domain decomposition is used
@@ -49,6 +51,8 @@ class Trainer:
         self.wandb_log = wandb_log
         self.amp_autocast = amp_autocast
         self.grad_clip = grad_clip
+        # todo: fix the error with yaml casting to array
+        self.precision_schedule = [int(x) for x in list(precision_schedule)]
         self.log_test_interval = log_test_interval
         self.log_output = log_output
         self.verbose = verbose
@@ -102,8 +106,6 @@ class Trainer:
         else:
             is_logger = True 
 
-        #if self.amp_autocast:
-        #    scaler = GradScaler()
 
         GPU_memory_meter_macro = AverageMeter()
         GPU_util_meter_macro = AverageMeter()
@@ -176,14 +178,6 @@ class Trainer:
                 if regularizer:
                     loss += regularizer.loss
 
-                # todo: probably make a flag to separately turn on grad scaling
-                #if self.amp_autocast:
-                #    scaler.scale(loss).backward()
-                #    scaler.step(optimizer)
-                #    scaler.update()
-                #else:
-                #    loss.backward()
-                #    optimizer.step()
                 loss.backward()
 
                 #third measurement
@@ -207,6 +201,20 @@ class Trainer:
                 scheduler.step(train_err)
             else:
                 scheduler.step()
+
+            if self.precision_schedule and epoch in self.precision_schedule:
+                # todo: currently hard-coded for a schedule of tanh, full_fft, full
+                # todo: also currently needs starting half_prec_fourier=True and stabilizer='tanh'
+                stabilizer = model.fourier_precision
+                if stabilizer[0] and stabilizer[1] == 'tanh':
+                    stabilizer = (True, 'full_fft')
+                    model.fourier_precision = stabilizer
+                    print('set half_prec_fourier:', model.fno_blocks.convs.half_prec_fourier, 'stabilizer:',model.fno_blocks.convs.stabilizer, 'amp', self.amp_autocast)
+                elif stabilizer[0] and stabilizer[1] == 'full_fft':
+                    stabilizer = (False, None)
+                    model.fourier_precision = stabilizer
+                    self.amp_autocast = False
+                    print('set half_prec_fourier:', model.fno_blocks.convs.half_prec_fourier, 'stabilizer:',model.fno_blocks.convs.stabilizer, 'amp', self.amp_autocast)
 
             epoch_train_time = default_timer() - t1
             time_meter.update(epoch_train_time)

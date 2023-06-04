@@ -54,6 +54,7 @@ default: &DEFAULT
     weight_decay: 1e-4
     amp_autocast: False
     grad_clip: False # either False/0, or a float that is the max norm of the gradients
+    precision_schedule: [125, 375] # Schedule for half, mixed, full-precision Fourier layer
 
     scheduler_T_max: 500 # For cosine only, typically take n_epochs
     scheduler_patience: 5 # For ReduceLROnPlateau only

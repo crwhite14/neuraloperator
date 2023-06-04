@@ -215,6 +215,14 @@ class FNO(nn.Module):
     def incremental_n_modes(self, incremental_n_modes):
         self.fno_blocks.incremental_n_modes = incremental_n_modes
 
+    @property
+    def fourier_precision(self):
+        return (self.fno_blocks.convs.half_prec_fourier, self.fno_blocks.convs.stabilizer)
+
+    @fourier_precision.setter
+    def fourier_precision(self, fourier_precision):
+        self.fno_blocks.convs.half_prec_fourier = fourier_precision[0]
+        self.fno_blocks.convs.stabilizer = fourier_precision[1]
 
 class FNO1d(FNO):
     """1D Fourier Neural Operator

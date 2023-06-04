@@ -339,7 +339,7 @@ class FactorizedSpectralConv(nn.Module):
 
             elif self.stabilizer == 'full_fft':
                 x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-                x = x.type(torch.complex32)
+                x = x.chalf()
 
             elif self.stabilizer == 'clip_hard':
                 x = x.half()
