@@ -18,7 +18,7 @@ config_name = 'default'
 #config_folder = os.path.join(get_project_root(), 'config')
 config_folder = os.path.join('..', 'config')
 
-pipe = ConfigPipeline([YamlConfig('./darcy_config.yaml', config_name=config_name, config_folder=config_folder),
+pipe = ConfigPipeline([YamlConfig('./factorized_darcy.yaml', config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
                        YamlConfig(config_folder=config_folder)
                       ])
@@ -152,6 +152,7 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
                   mg_patching_stitching=config.patching.stitching,
                   wandb_log=config.wandb.log,
                   amp_autocast=config.opt.amp_autocast,
+                  precision_schedule=config.opt.precision_schedule,
                   log_test_interval=config.wandb.log_test_interval,
                   log_output=config.wandb.log_output,
                   use_distributed=config.distributed.use_distributed,
