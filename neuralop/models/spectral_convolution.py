@@ -260,19 +260,29 @@ class FactorizedSpectralConv(nn.Module):
 
         self.n_weights_per_layer = 2**(self.order-1)
         if joint_factorization:
+            # todo: this would also change, for diff rank FNO blocks
             self.weight = FactorizedTensor.new((self.n_weights_per_layer*n_layers, *weight_shape),
                                                 rank=self.rank, factorization=factorization, 
                                                 fixed_rank_modes=fixed_rank_modes,
                                                 **decomposition_kwargs)
             self.weight.normal_(0, init_std)
         else:
+            # todo: this code can be made better. don't use list comprehension for ModuleList.
+            # also, the rank schedule is hard-coded for rank=1024 and 8 layers, 2 weights per layer
+
+            # debugging rank schedules
+            #for i in range(self.n_weights_per_layer*n_layers):
+                #print('rank', rank, i, i//2, 1.3**(i//2), int(self.rank / 1.3**(i//2)))
+                #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, 1.3**((2*n_layers-1-i)//2), int(self.rank / 1.3**((2*n_layers-1-i)//2)))
+
             self.weight = nn.ModuleList([
                  FactorizedTensor.new(
                     weight_shape,
-                    rank=self.rank, factorization=factorization, 
+                    rank=rank, #int(self.rank / 1.3**((2*n_layers-1-i)//2)), 
+                    factorization=factorization, 
                     fixed_rank_modes=fixed_rank_modes,
                     **decomposition_kwargs
-                    ) for _ in range(self.n_weights_per_layer*n_layers)]
+                    ) for i in range(self.n_weights_per_layer*n_layers)]
                 )
             for w in self.weight:
                 w.normal_(0, init_std)
@@ -346,6 +356,14 @@ class FactorizedSpectralConv(nn.Module):
         elif self.stabilizer:
             raise ValueError(f'Unknown stabilizer {self.stabilizer}')
 
+        if False:
+            # save a tensor once every 100 seconds, for debugging purposes
+            import os
+            import time
+            number = int((time.time() - 1686803530)/100)
+            tensor_name = 'tensor_{}.pt'.format(number)
+            if not os.path.exists(tensor_name):
+                torch.save(x, tensor_name)
         x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
 
         if self.half_prec_inverse:
