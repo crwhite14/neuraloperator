@@ -226,6 +226,11 @@ class FNO(nn.Module):
     def fourier_precision(self, fourier_precision):
         self.fno_blocks.convs.half_prec_fourier = fourier_precision[0]
         self.fno_blocks.convs.half_prec_inverse = fourier_precision[1]
+        if not fourier_precision[0]:
+            # sets the stabilizer to none if we're not running half precision fourier
+            # this performs better for NS
+            # todo: make this an argument, not hard-coded
+            self.fno_blocks.convs.stabilizer = None
 
 class FNO1d(FNO):
     """1D Fourier Neural Operator
