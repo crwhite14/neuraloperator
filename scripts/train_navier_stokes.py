@@ -18,7 +18,7 @@ config_name = 'default'
 #config_folder = os.path.join(get_project_root(), 'config')
 config_folder = os.path.join('..', 'config')
 
-config_file_name = 'factorized_config.yaml'
+config_file_name = 'factorized_config_renbo.yaml'
 
 pipe = ConfigPipeline([YamlConfig(config_file_name, config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),

@@ -43,7 +43,7 @@ default: &DEFAULT
     preactivation: 0
     factorization: 'cp' #'cp' in best
     joint_factorization: 0
-    rank: 512 #0.05
+    rank: 0.05
     fixed_rank_modes: False
     implementation: 'factorized'
 
@@ -93,9 +93,9 @@ default: &DEFAULT
   wandb:
     log: False
     name: None # If None, config will be used but you can override it here
-    group: 'neuraloperator' 
-    project: "lowprecision"
-    entity: "crwhite" # put your username here
+    group: '' 
+    project: "fno"
+    entity: "renbotu" # put your username here
     sweep: False
     log_output: True
     log_test_interval: 1

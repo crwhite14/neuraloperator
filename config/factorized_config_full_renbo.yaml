@@ -30,9 +30,9 @@ default: &DEFAULT
     fft_norm: 'forward'
     norm: 'group_norm'
     skip: 'linear'
-    half_prec_fourier: True
-    half_prec_inverse: True
-    stabilizer: 'tanh'
+    half_prec_fourier: False
+    half_prec_inverse: False
+    stabilizer: None
 
     use_mlp: 1
     mlp:
@@ -43,7 +43,7 @@ default: &DEFAULT
     preactivation: 0
     factorization: 'cp' #'cp' in best
     joint_factorization: 0
-    rank: 512 #0.05
+    rank: 0.05
     fixed_rank_modes: False
     implementation: 'factorized'
 
@@ -53,7 +53,7 @@ default: &DEFAULT
     learning_rate: 1e-3
     training_loss: 'h1'
     weight_decay: 1e-4
-    amp_autocast: True
+    amp_autocast: False
     grad_clip: False # either False/0, or a float that is the max norm of the gradients
     precision_schedule: None
 
@@ -93,9 +93,9 @@ default: &DEFAULT
   wandb:
     log: False
     name: None # If None, config will be used but you can override it here
-    group: 'neuraloperator' 
-    project: "lowprecision"
-    entity: "crwhite" # put your username here
+    group: '' 
+    project: "fno"
+    entity: "renbotu" # put your username here
     sweep: False
     log_output: True
     log_test_interval: 1
