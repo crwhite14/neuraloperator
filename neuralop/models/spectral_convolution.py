@@ -267,18 +267,25 @@ class FactorizedSpectralConv(nn.Module):
                                                 **decomposition_kwargs)
             self.weight.normal_(0, init_std)
         else:
-            # todo: this code can be made better. don't use list comprehension for ModuleList.
-            # also, the rank schedule is hard-coded for rank=1024 and 8 layers, 2 weights per layer
+            # todo: this code can be made more clean:
+            # The rank can be a list in the config file 
+            # not using list comprehension for ModuleList will make the code cleaner
+            # also, the rank schedule is currently hand-picked for 8 layers, 2 weights per layer
 
-            # debugging rank schedules
-            #for i in range(self.n_weights_per_layer*n_layers):
+            # for debugging:
+            for i in range(self.n_weights_per_layer*n_layers):
                 #print('rank', rank, i, i//2, 1.3**(i//2), int(self.rank / 1.3**(i//2)))
                 #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, 1.3**((2*n_layers-1-i)//2), int(self.rank / 1.3**((2*n_layers-1-i)//2)))
+                #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, int(1092 - 100*((2*n_layers-1-i)//2)))
+                print('rank', rank, i, i//2, int(1092 - 100*(i//2)))
+
 
             self.weight = nn.ModuleList([
                  FactorizedTensor.new(
                     weight_shape,
-                    rank=rank, #int(self.rank / 1.3**((2*n_layers-1-i)//2)), 
+                    #rank=rank, # fixed rank (original)
+                    #rank=int(1092 - 100*((2*n_layers-1-i)//2)), # ascending from 792 to 1092 
+                    rank=int(1092 - 100*(i//2)), # descending from 1092 to 792
                     factorization=factorization, 
                     fixed_rank_modes=fixed_rank_modes,
                     **decomposition_kwargs
