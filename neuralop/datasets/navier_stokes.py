@@ -164,7 +164,14 @@ def load_navier_stokes_pt(data_path, train_resolution,
 
     train_resolution_str = str(train_resolution)
 
-    data = torch.load(Path(data_path).joinpath('nsforcing_' + train_resolution_str + '_train.pt').as_posix())
+    #data = torch.load(Path(data_path).joinpath('nsforcing_' + train_resolution_str + '_train.pt').as_posix())
+
+    data = {}
+    data['x'] = torch.rand(500, 128, 128)
+    data['y'] = torch.rand(500, 128, 128)
+    #print(data['x'].shape, data['x'].dtype)
+    #print(data['y'].shape, data['y'].dtype)
+
     x_train = data['x'][0:n_train, :, :].unsqueeze(channel_dim).clone()
     y_train = data['y'][0:n_train, :, :].unsqueeze(channel_dim).clone()
     del data

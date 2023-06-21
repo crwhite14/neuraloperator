@@ -69,7 +69,7 @@ default: &DEFAULT
     folder: '/home/ubuntu/data/navier_stokes/'
     # folder: '/data'
     batch_size: 64
-    n_train: 10000
+    n_train: 500
     train_resolution: 128
     n_tests: [2000] #, 1000]
     test_resolutions: [128] #, 1024] 
@@ -90,7 +90,7 @@ default: &DEFAULT
 
   # Weights and biases
   wandb:
-    log: True
+    log: False
     name: None # If None, config will be used but you can override it here
     group: 'neuraloperator' 
     project: "lowprecision"
