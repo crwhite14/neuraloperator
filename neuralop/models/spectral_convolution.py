@@ -283,9 +283,9 @@ class FactorizedSpectralConv(nn.Module):
             self.weight = nn.ModuleList([
                  FactorizedTensor.new(
                     weight_shape,
-                    #rank=rank, # fixed rank (original)
+                    rank=rank, # fixed rank (original)
                     #rank=int(1092 - 100*((2*n_layers-1-i)//2)), # ascending from 792 to 1092 
-                    rank=int(1092 - 100*(i//2)), # descending from 1092 to 792
+                    #rank=int(1092 - 100*(i//2)), # descending from 1092 to 792
                     factorization=factorization, 
                     fixed_rank_modes=fixed_rank_modes,
                     **decomposition_kwargs
