@@ -9,6 +9,7 @@ from .transforms import PositionalEmbedding
 def load_darcy_flow_small(n_train, n_tests,
                 batch_size, test_batch_sizes,
                 test_resolutions=[16, 32],
+                val_split=0.0,
                 grid_boundaries=[[0,1],[0,1]],
                 positional_encoding=True,
                 encode_input=False,
@@ -51,6 +52,7 @@ def load_darcy_flow_small(n_train, n_tests,
                          n_train=n_train, n_tests=n_tests, 
                          batch_size=batch_size, test_batch_sizes=test_batch_sizes,
                          test_resolutions=test_resolutions, train_resolution=16,
+                         val_split=0.0,
                          grid_boundaries=grid_boundaries,
                          positional_encoding=positional_encoding,
                          encode_input=encode_input,
@@ -63,6 +65,7 @@ def load_darcy_pt(data_path,
                 batch_size, test_batch_sizes,
                 test_resolutions=[32],
                 train_resolution=32,
+                val_split=0.0,
                 grid_boundaries=[[0,1],[0,1]],
                 positional_encoding=True,
                 encode_input=False,
@@ -110,9 +113,21 @@ def load_darcy_pt(data_path,
         output_encoder = None
 
     train_db = TensorDataset(x_train, y_train, transform_x=PositionalEmbedding(grid_boundaries, 0) if positional_encoding else None)
+
+    #split training_db into train and val
+    new_n_train = int((1-val_split)*n_train)
+    n_val = n_train - new_n_train
+    train_db, val_db = torch.utils.data.random_split(train_db, [new_n_train, n_val], generator=torch.Generator().manual_seed(42))
+
     train_loader = torch.utils.data.DataLoader(train_db,
                                             batch_size=batch_size, shuffle=True,
                                             num_workers=0, pin_memory=True, persistent_workers=False)
+    val_loader = torch.utils.data.DataLoader(val_db,
+                                            batch_size=batch_size, 
+                                            shuffle=False, drop_last=True,
+                                            num_workers=0,
+                                            pin_memory=True,
+                                            persistent_workers=False)
 
     test_db = TensorDataset(x_test, y_test,transform_x=PositionalEmbedding(grid_boundaries, 0) if positional_encoding else None)
     test_loader = torch.utils.data.DataLoader(test_db,
@@ -134,4 +149,4 @@ def load_darcy_pt(data_path,
                                                   num_workers=0, pin_memory=True, persistent_workers=False)
         test_loaders[res] = test_loader
 
-    return train_loader, test_loaders, output_encoder
+    return train_loader, val_loader, test_loaders, output_encoder

@@ -60,10 +60,11 @@ if config.verbose:
     sys.stdout.flush()
 
 # Loading the Navier-Stokes dataset in 128x128 resolution
-train_loader, test_loaders, output_encoder = load_navier_stokes_pt(
+train_loader, val_loader, test_loaders, output_encoder = load_navier_stokes_pt(
         config.data.folder, train_resolution=config.data.train_resolution, n_train=config.data.n_train, batch_size=config.data.batch_size, 
         positional_encoding=config.data.positional_encoding,
         test_resolutions=config.data.test_resolutions, n_tests=config.data.n_tests, test_batch_sizes=config.data.test_batch_sizes,
+        val_split=0.0,
         encode_input=config.data.encode_input, encode_output=config.data.encode_output,
         num_workers=config.data.num_workers, pin_memory=config.data.pin_memory, persistent_workers=config.data.persistent_workers
         )

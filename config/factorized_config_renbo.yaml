@@ -30,9 +30,9 @@ default: &DEFAULT
     fft_norm: 'forward'
     norm: 'group_norm'
     skip: 'linear'
-    half_prec_fourier: True
-    half_prec_inverse: True
-    stabilizer: 'tanh'
+    half_prec_fourier: False
+    half_prec_inverse: False
+    stabilizer: None
 
     use_mlp: 1
     mlp:
@@ -53,7 +53,7 @@ default: &DEFAULT
     learning_rate: 1e-3
     training_loss: 'h1'
     weight_decay: 1e-4
-    amp_autocast: True
+    amp_autocast: False
     grad_clip: False # either False/0, or a float that is the max norm of the gradients
     precision_schedule: None
 
@@ -67,7 +67,7 @@ default: &DEFAULT
   data:
     # folder: '/home/nikola/HDD/NavierStokes/2D'
     #folder: '/home/ubuntu/data/navier_stokes/'
-    folder: '../neuralop/datasets/data' 
+    folder: '/home/renbo/Desktop/newDrive/cd45725b-8f22-4d81-a9d5-315ea4c5c776/pde_data/'
     # folder: '/data'
     batch_size: 64
     n_train: 10000

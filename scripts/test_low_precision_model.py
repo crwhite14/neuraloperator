@@ -12,7 +12,7 @@ from neuralop import get_model, H1Loss
 # Read the configuration
 config_name = 'default'
 #config_path = Path(__file__).parent.as_posix()
-pipe = ConfigPipeline([YamlConfig('./factorized_config_renbo.yaml', config_name='default', config_folder='../config'),
+pipe = ConfigPipeline([YamlConfig('./factorized_config_half_renbo.yaml', config_name='default', config_folder='../config'),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
                        YamlConfig(config_folder='../config')
                       ])
@@ -55,8 +55,8 @@ print(prof.key_averages(group_by_stack_n=20).table(sort_by="cuda_time_total", ro
 
 
 #generates profiling data in tensorboard
-
-worker_name = 'mixed_precision_rank005_fwd'
+'''
+worker_name = 'mixed_precision_rank005_dense_fwd'
 with torch.profiler.profile(
     activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
     schedule=torch.profiler.schedule(wait=10, warmup=100, active=100, repeat=1),
@@ -74,4 +74,4 @@ with torch.profiler.profile(
         del out
         #loss.backward()
         prof.step()
-
+'''

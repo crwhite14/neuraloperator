@@ -63,19 +63,21 @@ if config.verbose and is_logger:
 
 if config.data.train_resolution == 16:
     # Loading the Darcy dataset in 16x16 resolution
-    train_loader, test_loaders, output_encoder = load_darcy_flow_small(
+    train_loader, val_loader, test_loaders, output_encoder = load_darcy_flow_small(
         n_train=config.data.n_train, batch_size=config.data.batch_size, 
         positional_encoding=config.data.positional_encoding,
         test_resolutions=config.data.test_resolutions, n_tests=config.data.n_tests, test_batch_sizes=config.data.test_batch_sizes,
+        val_split=0.0,
         encode_input=config.data.encode_input, encode_output=config.data.encode_output,
         )
 else:
     # Loading the Darcy dataset in higher resolution
-    train_loader, test_loaders, output_encoder = load_darcy_pt(data_path=config.data.folder,
+    train_loader, val_loader, test_loaders, output_encoder = load_darcy_pt(data_path=config.data.folder,
             n_train=config.data.n_train, batch_size=config.data.batch_size, 
             positional_encoding=config.data.positional_encoding,
             train_resolution=config.data.train_resolution,
             test_resolutions=config.data.test_resolutions, n_tests=config.data.n_tests, test_batch_sizes=config.data.test_batch_sizes,
+            val_split=0.0,
             encode_input=config.data.encode_input, encode_output=config.data.encode_output,
             )
 

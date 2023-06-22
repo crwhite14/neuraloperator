@@ -15,6 +15,7 @@ def load_navier_stokes_zarr(data_path, n_train, batch_size,
                             test_resolutions=[128, 256, 512, 1024],
                             n_tests=[2000, 500, 500, 500],
                             test_batch_sizes=[8, 4, 1],
+                            val_split=0.0, 
                             positional_encoding=True,
                             grid_boundaries=[[0,1],[0,1]],
                             encode_input=True,
@@ -43,6 +44,11 @@ def load_navier_stokes_zarr(data_path, n_train, batch_size,
 
     training_db.transform_x = transforms.Compose(transform_x)
     training_db.transform_y = transform_y
+
+    #split training_db into train and val
+    new_n_train = int((1-val_split)*n_train)
+    n_val = n_train - new_n_train
+    training_db, val_db = torch.utils.data.random_split(training_db, [new_n_train, n_val], generator=torch.Generator().manual_seed(42))
     
     train_loader = torch.utils.data.DataLoader(training_db,
                                                batch_size=batch_size, drop_last=True,
@@ -50,6 +56,12 @@ def load_navier_stokes_zarr(data_path, n_train, batch_size,
                                                num_workers=num_workers,
                                                pin_memory=pin_memory,
                                                persistent_workers=persistent_workers)
+    val_loader = torch.utils.data.DataLoader(val_db,
+                                             batch_size=batch_size, drop_last=True,
+                                             shuffle=False,
+                                             num_workers=num_workers,
+                                             pin_memory=pin_memory,
+                                             persistent_workers=persistent_workers)
 
     test_loaders = dict()
     for (res, n_test, test_batch_size) in zip(test_resolutions, n_tests, test_batch_sizes):
@@ -74,7 +86,7 @@ def load_navier_stokes_zarr(data_path, n_train, batch_size,
                                                         pin_memory=pin_memory, 
                                                         persistent_workers=persistent_workers)
 
-    return train_loader, test_loaders, transform_y
+    return train_loader, val_loader, test_loaders, transform_y
 
 
 def load_navier_stokes_hdf5(data_path, n_train, batch_size,
@@ -82,6 +94,7 @@ def load_navier_stokes_hdf5(data_path, n_train, batch_size,
                             test_resolutions=[128, 256, 512, 1024],
                             n_tests=[2000, 500, 500, 500],
                             test_batch_sizes=[8, 4, 1],
+                            val_split=0.0, 
                             positional_encoding=True,
                             grid_boundaries=[[0,1],[0,1]],
                             encode_input=True,
@@ -110,6 +123,11 @@ def load_navier_stokes_hdf5(data_path, n_train, batch_size,
 
     training_db.transform_x = transforms.Compose(transform_x)
     training_db.transform_y = transform_y
+
+    #split training_db into train and val
+    new_n_train = int((1-val_split)*n_train)
+    n_val = n_train - new_n_train
+    training_db, val_db = torch.utils.data.random_split(training_db, [new_n_train, n_val], generator=torch.Generator().manual_seed(42))
     
     train_loader = torch.utils.data.DataLoader(training_db,
                                                batch_size=batch_size, 
@@ -117,6 +135,13 @@ def load_navier_stokes_hdf5(data_path, n_train, batch_size,
                                                num_workers=num_workers,
                                                pin_memory=pin_memory,
                                                persistent_workers=persistent_workers)
+    
+    val_loader = torch.utils.data.DataLoader(val_db,
+                                            batch_size=batch_size, 
+                                            shuffle=False,
+                                            num_workers=num_workers,
+                                            pin_memory=pin_memory,
+                                            persistent_workers=persistent_workers)
 
     test_loaders = dict()
     for (res, n_test, test_batch_size) in zip(test_resolutions, n_tests, test_batch_sizes):
@@ -141,13 +166,14 @@ def load_navier_stokes_hdf5(data_path, n_train, batch_size,
                                                         pin_memory=pin_memory, 
                                                         persistent_workers=persistent_workers)
 
-    return train_loader, test_loaders, transform_y
+    return train_loader, val_loader, test_loaders, transform_y
 
 
 def load_navier_stokes_pt(data_path, train_resolution,
                           n_train, n_tests,
                           batch_size, test_batch_sizes,
                           test_resolutions,
+                          val_split=0.0,
                           grid_boundaries=[[0,1],[0,1]],
                           positional_encoding=True,
                           encode_input=True,
@@ -203,9 +229,21 @@ def load_navier_stokes_pt(data_path, train_resolution,
         output_encoder = None
 
     train_db = TensorDataset(x_train, y_train, transform_x=PositionalEmbedding(grid_boundaries, 0) if positional_encoding else None)
+
+    #split training_db into train and val
+    new_n_train = int((1-val_split)*n_train)
+    n_val = n_train - new_n_train
+    train_db, val_db = torch.utils.data.random_split(train_db, [new_n_train, n_val], generator=torch.Generator().manual_seed(42))
+
     train_loader = torch.utils.data.DataLoader(train_db,
                                                batch_size=batch_size, shuffle=True, drop_last=True,
                                                num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers)
+    val_loader = torch.utils.data.DataLoader(val_db,
+                                            batch_size=batch_size, 
+                                            shuffle=False, drop_last=True,
+                                            num_workers=num_workers,
+                                            pin_memory=pin_memory,
+                                            persistent_workers=persistent_workers)
 
     test_db = TensorDataset(x_test, y_test,transform_x=PositionalEmbedding(grid_boundaries, 0) if positional_encoding else None)
     test_loader = torch.utils.data.DataLoader(test_db,
@@ -225,7 +263,7 @@ def load_navier_stokes_pt(data_path, train_resolution,
                                                   num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers)
         test_loaders[res] = test_loader
 
-    return train_loader, test_loaders, output_encoder
+    return train_loader, val_loader, test_loaders, output_encoder
 
 
 def _load_navier_stokes_test_HR(data_path, n_test, resolution=256,
