@@ -1,7 +1,8 @@
 from pathlib import Path
 import torch
+from .tensor_dataset import TensorDataset
 
-def load_burgers(data_path, n_train, n_test, batch_train=32, batch_test=100, 
+def load_burgers(data_path, n_train, n_test, batch_size=32, batch_test=100, 
                  time=1, grid=[0,1]):
 
     data_path = Path(data_path).joinpath('burgers.pt').as_posix()
@@ -24,7 +25,11 @@ def load_burgers(data_path, n_train, n_test, batch_train=32, batch_test=100,
         x_train = torch.cat((x_train.unsqueeze(1), grid_train.unsqueeze(1)), 1)
         x_test = torch.cat((x_test.unsqueeze(1), grid_test.unsqueeze(1)), 1)
 
-    train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(x_train, y_train), batch_size=batch_train, shuffle=False)
-    test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(x_test, y_test), batch_size=batch_test, shuffle=False)
+    train_db = TensorDataset(x_train, y_train)
+    train_loader = torch.utils.data.DataLoader(train_db,batch_size=batch_size, shuffle=False)
 
-    return train_loader, test_loader
+    test_db = TensorDataset(x_test, y_test)
+    test_loader = torch.utils.data.DataLoader(test_db,batch_size=batch_test, shuffle=False)
+
+    # todo: add output encoder?
+    return train_loader, test_loader, None

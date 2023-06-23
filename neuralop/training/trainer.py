@@ -174,6 +174,9 @@ class Trainer:
                     with amp.autocast(enabled=True):
                         loss = training_loss(out.float(), y)
                 else:
+                    if len(y.shape) == 2:
+                        # todo: currently a bug with 1D Burgers, must be fixed.
+                        y = y.view(y.shape[0], 1, y.shape[1])
                     loss = training_loss(out.float(), y)
 
                 #second measurement
@@ -311,6 +314,9 @@ class Trainer:
                 out = model(x)
         
                 out, y = self.patcher.unpatch(out, y, evaluation=True)
+                if len(y.shape) == 2:
+                    # todo: currently a bug with 1D Burgers, must be fixed.
+                    y = y.view(y.shape[0], 1, y.shape[1])
 
                 if output_encoder is not None:
                     out = output_encoder.decode(out)
