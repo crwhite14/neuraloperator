@@ -6,7 +6,7 @@ from configmypy import ConfigPipeline, YamlConfig, ArgparseConfig
 from neuralop import get_model
 from neuralop import Trainer
 from neuralop.training import setup
-from neuralop.datasets import load_burgers
+from neuralop.datasets import load_advection
 from neuralop.utils import get_wandb_api_key, count_params, get_project_root, set_seed
 from neuralop import LpLoss, H1Loss
 
@@ -18,7 +18,7 @@ config_name = 'default'
 #config_folder = os.path.join(get_project_root(), 'config')
 config_folder = os.path.join('..', 'config')
 
-pipe = ConfigPipeline([YamlConfig('./factorized_burgers.yaml', config_name=config_name, config_folder=config_folder),
+pipe = ConfigPipeline([YamlConfig('./factorized_advection.yaml', config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
                        YamlConfig(config_folder=config_folder)
                       ])
@@ -62,8 +62,8 @@ if config.verbose and is_logger:
 
 #(data_path, n_train, n_test, batch_train=32, batch_test=100,time=1, grid=[0,1]):
 
-# Loading the Burgers dataset
-train_loader, test_loaders, output_encoder = load_burgers(data_path=config.data.folder,
+# Loading the Advection dataset
+train_loader, test_loaders, output_encoder = load_advection(data_path=config.data.folder,
         n_train=config.data.n_train, batch_size=config.data.batch_size, 
         n_test=config.data.n_tests[0], batch_test=config.data.test_batch_sizes[0],
         )

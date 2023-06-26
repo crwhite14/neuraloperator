@@ -31,5 +31,5 @@ def load_burgers(data_path, n_train, n_test, batch_size=32, batch_test=100,
     test_db = TensorDataset(x_test, y_test)
     test_loader = torch.utils.data.DataLoader(test_db,batch_size=batch_test, shuffle=False)
 
-    # todo: add output encoder?
+    # todo: add positional encoder, normalization, output encoder
     return train_loader, test_loader, None
