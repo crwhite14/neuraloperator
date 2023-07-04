@@ -47,7 +47,9 @@ class FNOBlocks(nn.Module):
         self.out_channels = out_channels
         self.n_layers = n_layers
         self.joint_factorization = joint_factorization
-        self.non_linearity = non_linearity
+        #self.non_linearity = non_linearity
+        self.non_linearity_1 = non_linearity[0]
+        self.non_linearity_2 = non_linearity[1]
         self.rank = rank
         self.factorization = factorization
         self.fixed_rank_modes = fixed_rank_modes
@@ -105,7 +107,7 @@ class FNOBlocks(nn.Module):
     def forward(self, x, index=0):
         
         if self.preactivation:
-            x = self.non_linearity(x)
+            x = self.non_linearity_1(x)
 
             if self.norm is not None:
                 x = self.norm[self.n_norms*index](x)
@@ -127,14 +129,14 @@ class FNOBlocks(nn.Module):
         x = x_fno + x_skip_fno
 
         if not self.preactivation and (self.mlp is not None) or (index < (self.n_layers - index)):
-            x = self.non_linearity(x)
+            x = self.non_linearity_1(x)
 
         if self.mlp is not None:
             # x_skip = self.mlp_skips[index](x)
 
             if self.preactivation:
                 if index < (self.n_layers - 1):
-                    x = self.non_linearity(x)
+                    x = self.non_linearity_2(x)
 
                 if self.norm is not None:
                     x = self.norm[self.n_norms*index+1](x)
@@ -146,7 +148,7 @@ class FNOBlocks(nn.Module):
 
             if not self.preactivation:
                 if index < (self.n_layers - 1):
-                    x = self.non_linearity(x)
+                    x = self.non_linearity_2(x)
         return x
 
     @property

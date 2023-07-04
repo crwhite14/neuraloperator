@@ -25,7 +25,7 @@ class Projection(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.hidden_channels = in_channels if hidden_channels is None else hidden_channels 
-        self.non_linearity = non_linearity
+        self.non_linearity = non_linearity[1]
         Conv = getattr(nn, f'Conv{n_dim}d')
         self.fc1 = Conv(in_channels, hidden_channels, 1)
         self.fc2 = Conv(hidden_channels, out_channels, 1)

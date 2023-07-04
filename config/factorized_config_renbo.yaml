@@ -40,7 +40,7 @@ default: &DEFAULT
         dropout: 0
 
     separable: 0
-    preactivation: 0
+    preactivation: 1
     factorization: 'cp' #'cp' in best
     joint_factorization: 0
     rank: 0.05
@@ -67,14 +67,14 @@ default: &DEFAULT
   data:
     # folder: '/home/nikola/HDD/NavierStokes/2D'
     #folder: '/home/ubuntu/data/navier_stokes/'
-    folder: '/home/renbo/Desktop/newDrive/cd45725b-8f22-4d81-a9d5-315ea4c5c776/pde_data/'
+    folder: '/home/renbo/Desktop/New-Ops/neuraloperator-branches/neuraloperator-colin/neuralop/datasets/data/'
     # folder: '/data'
     batch_size: 64
     n_train: 10000
     train_resolution: 128
-    n_tests: [2000, 200]
-    test_resolutions: [128, 1024] 
-    test_batch_sizes: [16, 4]
+    n_tests: [2000] #, 200]
+    test_resolutions: [128] #, 1024] 
+    test_batch_sizes: [16] #, 4]
     positional_encoding: True
 
     encode_input: True

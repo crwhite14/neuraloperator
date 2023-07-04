@@ -11,7 +11,7 @@ from neuralop.utils import get_wandb_api_key, count_params, get_project_root, se
 from neuralop import LpLoss, H1Loss
 
 from torch.nn.parallel import DistributedDataParallel as DDP
-
+import torch.nn.functional as F
 
 # Read the configuration
 config_name = 'default'
@@ -26,6 +26,8 @@ pipe = ConfigPipeline([YamlConfig(config_file_name, config_name=config_name, con
                       ])
 config = pipe.read_conf()
 config_name = pipe.steps[-1].config_name
+config['tfno2d']['non_linearity']=[F.tanh, F.gelu]
+
 
 # Set seed
 if 'seed' in config and config.seed:
