@@ -3,7 +3,8 @@ from torch.cuda import amp
 from torch.cuda.amp import GradScaler
 from timeit import default_timer
 import wandb
-import sys 
+import sys
+import os
 
 import neuralop.mpu.comm as comm
 
@@ -15,7 +16,8 @@ from .utils import AverageMeter, get_gpu_total_mem, get_gpu_usage
 class Trainer:
     def __init__(self, model, n_epochs, wandb_log=True, amp_autocast=False, grad_clip=False, device=None,
                  mg_patching_levels=0, mg_patching_padding=0, mg_patching_stitching=True, precision_schedule=None,
-                 log_test_interval=1, log_output=False, use_distributed=False, verbose=True):
+                 log_test_interval=1, log_output=False, use_distributed=False, save_interval=10, model_save_dir='./checkpoints', 
+                 verbose=True):
         """
         A general Trainer class to train neural-operators on given datasets
 
@@ -45,6 +47,9 @@ class Trainer:
             if True, and if wandb_log is also True, log output images to wandb
         use_distributed : bool, default is False
             whether to use DDP
+        save_interval : int, default is 10
+            how frequently to save checkpoints
+        model_save_dir : str, default is './checkpoints'
         verbose : bool, default is True
         """
         self.n_epochs = n_epochs
@@ -67,6 +72,11 @@ class Trainer:
         self.mg_patching_stitching = mg_patching_stitching
         self.use_distributed = use_distributed
         self.device = device
+        self.save_interval = save_interval
+        self.model_save_dir = model_save_dir
+        #create model save dir if not exist
+        os.makedirs(self.model_save_dir, exist_ok=True)
+        
 
         if mg_patching_levels > 0:
             self.mg_n_patches = 2**mg_patching_levels
@@ -270,6 +280,15 @@ class Trainer:
                     model.fourier_precision = fourier_precision
                     self.amp_autocast = False
                     print('set half_prec_fourier:', model.fno_blocks.convs.half_prec_fourier, 'half_prec_inverse:',model.fno_blocks.convs.half_prec_inverse, 'amp', self.amp_autocast)
+            
+            #save model every save_interval epochs; contains model and checkpoint states 
+            if epoch % self.save_interval == 0:
+                self.save_model_checkpoint(-1, model, optimizer)
+                if self.wandb_log and is_logger:
+                    save_path = os.path.join(self.model_save_dir, f'checkpoint_best.pt')
+                    wandb.save(save_path)
+                
+        return 
 
     def evaluate(self, model, loss_dict, data_loader, output_encoder=None,
                  log_prefix=''):
@@ -338,4 +357,46 @@ class Trainer:
 
         return errors
 
+    def save_model_checkpoint(self, epoch, model, optimizer):
+        """Saves a model checkpoint
+        
+        Parameters
+        ----------
+        epoch : int
+            epoch number
+        model : model to save
+        optimizer : optimizer to save
+        """
+        if epoch == -1:
+            save_path = os.path.join(self.model_save_dir, f'checkpoint_best.pt')
+        else:
+            save_path = os.path.join(self.model_save_dir, f'checkpoint_{epoch}.pt')
 
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+        }
+        torch.save(checkpoint, save_path)
+
+        return 
+
+    def load_model_checkpoint(self, epoch, model, optimizer):
+        """Loads a model checkpoint
+        
+        Parameters
+        ----------
+        epoch : int
+            epoch number
+        model : model to load
+        optimizer : optimizer to load
+        """
+        if epoch == -1:
+            load_path = os.path.join(self.model_save_dir, f'checkpoint_best.pt')
+        else:
+            load_path = os.path.join(self.model_save_dir, f'checkpoint_{epoch}.pt')
+        checkpoint = torch.load(load_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        return checkpoint['epoch']

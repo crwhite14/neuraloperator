@@ -2,6 +2,7 @@ import torch
 import wandb
 import sys
 import os
+import time
 from configmypy import ConfigPipeline, YamlConfig, ArgparseConfig
 from neuralop import get_model
 from neuralop import Trainer
@@ -17,7 +18,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 config_name = 'default'
 #config_folder = os.path.join(get_project_root(), 'config')
 config_folder = os.path.join('..', 'config')
-
 config_file_name = 'factorized_config_renbo.yaml'
 
 pipe = ConfigPipeline([YamlConfig(config_file_name, config_name=config_name, config_folder=config_folder),
@@ -67,45 +67,9 @@ train_loader, test_loaders, output_encoder = load_navier_stokes_pt(
         encode_input=config.data.encode_input, encode_output=config.data.encode_output,
         num_workers=config.data.num_workers, pin_memory=config.data.pin_memory, persistent_workers=config.data.persistent_workers
         )
-
 model = get_model(config)
 model = model.to(device)
 
-'''
-from collections import OrderedDict
-
-activations = OrderedDict()
-def forward_hook(module, input, output):
-    module_key = f"{module.__class__.__name__}_{id(module)}"
-    activations[module_key] = input
-    if torch.isnan(output).any():
-        print(f'Got NaN in {module}')
-        for key in activations.keys():
-            print(key, activations[key][0].shape, torch.max(activations[key][0]), torch.min(activations[key][0]))
-        raise ValueError('NaN in output')
-
-for module in model.modules():
-    module.register_forward_hook(forward_hook)
-
-
-def hook_fn_forward(module, input, output):
-    if torch.isnan(input[0]).any():
-        print('Input contains NaN values')
-    if torch.isnan(output).any():
-        print('Output contains NaN values')
-
-def hook_fn_backward(module, grad_input, grad_output):
-    for g in grad_input:
-        if g is not None:
-            if torch.isnan(g).any():
-                print('Grad Input contains NaN values')
-    if any(torch.isnan(g).any() for g in grad_output):
-        print('Grad Output contains NaN values')
-
-conv_layer = model.lifting.fc
-conv_layer.register_forward_hook(hook_fn_forward)
-conv_layer.register_backward_hook(hook_fn_backward)
-'''
 
 #Use distributed data parallel 
 if config.distributed.use_distributed:
@@ -130,6 +94,7 @@ if is_logger:
             to_log['space_savings'] = 1 - (n_params/config.n_params_baseline)
         wandb.log(to_log)
         wandb.watch(model)
+
 
 #Create the optimizer
 optimizer = torch.optim.Adam(model.parameters(), 
@@ -159,7 +124,7 @@ else:
     raise ValueError(f'Got training_loss={config.opt.training_loss} but expected one of ["l2", "h1"]')
 eval_losses={'h1': h1loss, 'l2': l2loss}
 
-if config.verbose:
+if config.verbose and is_logger:
     print('\n### MODEL ###\n', model)
     print('\n### OPTIMIZER ###\n', optimizer)
     print('\n### SCHEDULER ###\n', scheduler)
@@ -176,22 +141,55 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
                   mg_patching_stitching=config.patching.stitching,
                   wandb_log=config.wandb.log,
                   amp_autocast=config.opt.amp_autocast,
-                  grad_clip=config.opt.grad_clip,
                   precision_schedule=config.opt.precision_schedule,
                   log_test_interval=config.wandb.log_test_interval,
                   log_output=config.wandb.log_output,
                   use_distributed=config.distributed.use_distributed,
-                  verbose=config.verbose)
+                  verbose=config.verbose and is_logger)
 
 
-trainer.train(train_loader, test_loaders,
-              output_encoder,
-              model, 
-              optimizer,
-              scheduler, 
-              regularizer=False, 
-              training_loss=train_loss,
-              eval_losses=eval_losses)
+# load model from dict
+model_load_epoch = -1
+trainer.load_model_checkpoint(model_load_epoch, model, optimizer)
+
+                
+msg = f'[{model_load_epoch}]'
+
+values_to_log = dict()
+
+#time regular model (half-prec model)
+start_inference = time.time()
+for loader_name, loader in test_loaders.items():
+
+    errors = trainer.evaluate(model, eval_losses, loader, output_encoder, log_prefix=loader_name)
+
+    for loss_name, loss_value in errors.items():
+        msg += f', {loss_name}={loss_value:.4f}'
+        values_to_log[loss_name] = loss_value
+
+end_inference = time.time()
+inference_time = end_inference - start_inference
+msg += f', inference_time={inference_time:.4f}'
+print(msg)
+
+msg = f'[{model_load_epoch}]'
+#time quantized model
+model_int8 = torch.ao.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+model_int8 = model_int8.to(device)
+start_inference = time.time()
+for loader_name, loader in test_loaders.items():
+
+    errors = trainer.evaluate(model_int8, eval_losses, loader, output_encoder, log_prefix=loader_name)
+
+    for loss_name, loss_value in errors.items():
+        msg += f', {loss_name}={loss_value:.4f}'
+        values_to_log[loss_name] = loss_value
+
+end_inference = time.time()
+inference_time = end_inference - start_inference
+msg += f', inference_time={inference_time:.4f}'
+print(msg)
+
 
 if config.wandb.log and is_logger:
     wandb.finish()
