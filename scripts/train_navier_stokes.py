@@ -71,42 +71,6 @@ train_loader, test_loaders, output_encoder = load_navier_stokes_pt(
 model = get_model(config)
 model = model.to(device)
 
-'''
-from collections import OrderedDict
-
-activations = OrderedDict()
-def forward_hook(module, input, output):
-    module_key = f"{module.__class__.__name__}_{id(module)}"
-    activations[module_key] = input
-    if torch.isnan(output).any():
-        print(f'Got NaN in {module}')
-        for key in activations.keys():
-            print(key, activations[key][0].shape, torch.max(activations[key][0]), torch.min(activations[key][0]))
-        raise ValueError('NaN in output')
-
-for module in model.modules():
-    module.register_forward_hook(forward_hook)
-
-
-def hook_fn_forward(module, input, output):
-    if torch.isnan(input[0]).any():
-        print('Input contains NaN values')
-    if torch.isnan(output).any():
-        print('Output contains NaN values')
-
-def hook_fn_backward(module, grad_input, grad_output):
-    for g in grad_input:
-        if g is not None:
-            if torch.isnan(g).any():
-                print('Grad Input contains NaN values')
-    if any(torch.isnan(g).any() for g in grad_output):
-        print('Grad Output contains NaN values')
-
-conv_layer = model.lifting.fc
-conv_layer.register_forward_hook(hook_fn_forward)
-conv_layer.register_backward_hook(hook_fn_backward)
-'''
-
 #Use distributed data parallel 
 if config.distributed.use_distributed:
     model = DDP(model,

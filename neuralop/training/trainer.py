@@ -5,6 +5,7 @@ from timeit import default_timer
 import wandb
 import sys
 import os
+from datetime import datetime
 
 import neuralop.mpu.comm as comm
 
@@ -240,6 +241,10 @@ class Trainer:
                 values_to_log = dict(train_err=train_err, time=epoch_train_time, avg_loss=avg_loss)
 
                 for loader_name, loader in test_loaders.items():
+                    if loader_name == 1024 and epoch < 499:
+                        print('not final epoch, not evaluating 1024 res data')
+                        continue
+                    
                     if epoch == self.n_epochs - 1 and self.log_output:
                         to_log_output = True
                     else:
@@ -285,7 +290,8 @@ class Trainer:
             if epoch % self.save_interval == 0:
                 self.save_model_checkpoint(-1, model, optimizer)
                 if self.wandb_log and is_logger:
-                    save_path = os.path.join(self.model_save_dir, f'checkpoint_best.pt')
+                    datestr = datetime.today().strftime('%Y-%m-%d')
+                    save_path = os.path.join(self.model_save_dir, f'checkpoint_last_{datestr}.pt')
                     wandb.save(save_path)
                 
         return 
@@ -367,10 +373,11 @@ class Trainer:
         model : model to save
         optimizer : optimizer to save
         """
+        datestr = datetime.today().strftime('%Y-%m-%d')
         if epoch == -1:
-            save_path = os.path.join(self.model_save_dir, f'checkpoint_best.pt')
+            save_path = os.path.join(self.model_save_dir, f'checkpoint_best_{datestr}.pt')
         else:
-            save_path = os.path.join(self.model_save_dir, f'checkpoint_{epoch}.pt')
+            save_path = os.path.join(self.model_save_dir, f'checkpoint_{epoch}_{datestr}.pt')
 
         checkpoint = {
             'epoch': epoch,

@@ -273,11 +273,11 @@ class FactorizedSpectralConv(nn.Module):
             # also, the rank schedule is currently hand-picked for 8 layers, 2 weights per layer
 
             # for debugging:
-            for i in range(self.n_weights_per_layer*n_layers):
+            #for i in range(self.n_weights_per_layer*n_layers):
                 #print('rank', rank, i, i//2, 1.3**(i//2), int(self.rank / 1.3**(i//2)))
                 #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, 1.3**((2*n_layers-1-i)//2), int(self.rank / 1.3**((2*n_layers-1-i)//2)))
                 #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, int(1092 - 100*((2*n_layers-1-i)//2)))
-                print('rank', rank, i, i//2, int(1092 - 100*(i//2)))
+                #print('rank', rank, i, i//2, int(1092 - 100*(i//2)))
 
 
             self.weight = nn.ModuleList([

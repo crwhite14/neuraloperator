@@ -91,16 +91,23 @@ class FNOBlocks(nn.Module):
 
         # Each block will have 2 norms if we also use an MLP
         self.n_norms = 1 if self.mlp is None else 2
-        if norm is None:
+        if norm is None or norm == 'none':
             self.norm = None
         elif norm == 'instance_norm':
             self.norm = nn.ModuleList([getattr(nn, f'InstanceNorm{self.n_dim}d')(num_features=self.out_channels) for _ in range(n_layers*self.n_norms)])
         elif norm == 'group_norm':
             self.norm = nn.ModuleList([nn.GroupNorm(num_groups=1, num_channels=self.out_channels) for _ in range(n_layers*self.n_norms)])
         elif norm == 'layer_norm':
-            self.norm = nn.ModuleList([nn.LayerNorm(elementwise_affine=False) for _ in range(n_layers*self.n_norms)])
+            self.norm = nn.ModuleList([nn.LayerNorm([64, 128, 128], elementwise_affine=False) for _ in range(n_layers*self.n_norms)])
         else:
             raise ValueError(f'Got {norm=} but expected None or one of [instance_norm, group_norm, layer_norm]')
+        
+        '''
+        self.norm = nn.ModuleList([nn.GroupNorm(num_groups=1, num_channels=self.out_channels), nn.GroupNorm(num_groups=64, num_channels=self.out_channels),
+                                nn.GroupNorm(num_groups=1, num_channels=self.out_channels), nn.GroupNorm(num_groups=4, num_channels=self.out_channels),
+                                nn.GroupNorm(num_groups=1, num_channels=self.out_channels), nn.GroupNorm(num_groups=2, num_channels=self.out_channels),
+                                nn.GroupNorm(num_groups=64, num_channels=self.out_channels), nn.GroupNorm(num_groups=64, num_channels=self.out_channels)])
+        '''
 
     def forward(self, x, index=0):
         

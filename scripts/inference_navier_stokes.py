@@ -1,6 +1,7 @@
 import torch
 import wandb
 import sys
+import copy
 import os
 import time
 from configmypy import ConfigPipeline, YamlConfig, ArgparseConfig
@@ -10,8 +11,38 @@ from neuralop.training import setup
 from neuralop.datasets.navier_stokes import load_navier_stokes_pt
 from neuralop.utils import get_wandb_api_key, count_params, get_project_root, set_seed
 from neuralop import LpLoss, H1Loss
+from neuralop.models.spectral_convolution import FactorizedSpectralConv
 
 from torch.nn.parallel import DistributedDataParallel as DDP
+
+from torch.ao.quantization import QConfigMapping
+from torch.ao.quantization.qconfig_mapping import get_default_qconfig_mapping
+from torch.ao.quantization.fx.custom_config import PrepareCustomConfig
+
+# Note that this is temporary, we'll expose these functions to torch.ao.quantization after official releasee
+from torch.quantization.quantize_fx import prepare_fx, convert_fx
+
+# ignore complexhalf warnings
+import warnings
+warnings.filterwarnings("ignore")
+
+def get_size_of_model(model):
+    torch.save(model.state_dict(), "temp.p")
+    print('Size (MB):', os.path.getsize("temp.p")/1e6)
+    size = os.path.getsize("temp.p")/1e6
+    os.remove('temp.p')
+    return size
+
+def replace_layers(model, old, new):
+    for n, module in model.named_children():
+        if len(list(module.children())) > 0:
+            ## compound module, go inside it
+            replace_layers(module, old, new)
+            
+        if isinstance(module, old):
+            ## simple module
+            #new = new.from_float(module)
+            setattr(model, n, new)
 
 
 # Read the configuration
@@ -35,29 +66,8 @@ if 'seed' in config and config.seed:
 #Set-up distributed communication, if using
 device, is_logger = setup(config)
 
-#Set up WandB logging
-if config.wandb.log and is_logger:
-    #wandb.login(key=get_wandb_api_key())
-    if config.wandb.name:
-        wandb_name = config.wandb.name
-    else:
-        wandb_name = '_'.join(
-            f'{var}' for var in [config_name, config.tfno2d.n_layers, config.tfno2d.n_modes_width, config.tfno2d.n_modes_height,
-                                 config.tfno2d.hidden_channels, config.tfno2d.factorization, config.tfno2d.rank, 
-                                 config.patching.levels, config.patching.padding])
-    wandb.init(config=config, name=wandb_name, group=config.wandb.group,
-               project=config.wandb.project, entity=config.wandb.entity)
-    if config.wandb.sweep:
-        for key in wandb.config.keys():
-            config.params[key] = wandb.config[key]
-
 # Make sure we only print information when needed
 config.verbose = config.verbose and is_logger
-
-#Print config to screen
-if config.verbose:
-    pipe.log()
-    sys.stdout.flush()
 
 # Loading the Navier-Stokes dataset in 128x128 resolution
 train_loader, test_loaders, output_encoder = load_navier_stokes_pt(
@@ -78,23 +88,6 @@ if config.distributed.use_distributed:
                 output_device=device.index,
                 static_graph=True)
 
-#Log parameter count
-if is_logger:
-    n_params = count_params(model)
-
-    if config.verbose:
-        print(f'\nn_params: {n_params}')
-        sys.stdout.flush()
-
-    if config.wandb.log:
-        to_log = {'n_params': n_params}
-        if config.n_params_baseline is not None:
-            to_log['n_params_baseline'] = config.n_params_baseline,
-            to_log['compression_ratio'] = config.n_params_baseline/n_params,
-            to_log['space_savings'] = 1 - (n_params/config.n_params_baseline)
-        wandb.log(to_log)
-        wandb.watch(model)
-
 
 #Create the optimizer
 optimizer = torch.optim.Adam(model.parameters(), 
@@ -112,7 +105,6 @@ elif config.opt.scheduler == 'StepLR':
 else:
     raise ValueError(f'Got {config.opt.scheduler=}')
 
-
 # Creating the losses
 l2loss = LpLoss(d=2, p=2)
 h1loss = H1Loss(d=2)
@@ -123,16 +115,6 @@ elif config.opt.training_loss == 'h1':
 else:
     raise ValueError(f'Got training_loss={config.opt.training_loss} but expected one of ["l2", "h1"]')
 eval_losses={'h1': h1loss, 'l2': l2loss}
-
-if config.verbose and is_logger:
-    print('\n### MODEL ###\n', model)
-    print('\n### OPTIMIZER ###\n', optimizer)
-    print('\n### SCHEDULER ###\n', scheduler)
-    print('\n### LOSSES ###')
-    print(f'\n * Train: {train_loss}')
-    print(f'\n * Test: {eval_losses}')
-    print(f'\n### Beginning Training...\n')
-    sys.stdout.flush()
 
 trainer = Trainer(model, n_epochs=config.opt.n_epochs,
                   device=device,
@@ -152,34 +134,87 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
 model_load_epoch = -1
 trainer.load_model_checkpoint(model_load_epoch, model, optimizer)
 
-                
-msg = f'[{model_load_epoch}]'
+#GPU warm-up
+print('GPU warm-up')
+trainer.evaluate(model, eval_losses, train_loader, output_encoder)
 
 values_to_log = dict()
 
 #time regular model (half-prec model)
-start_inference = time.time()
-for loader_name, loader in test_loaders.items():
+for _ in range(3):
+    msg = f'[{model_load_epoch}]'
+    print('Time regular model (half-prec model)')
+    start_inference = time.time()
+    for loader_name, loader in test_loaders.items():
 
-    errors = trainer.evaluate(model, eval_losses, loader, output_encoder, log_prefix=loader_name)
+        errors = trainer.evaluate(model, eval_losses, loader, output_encoder, log_prefix=loader_name)
 
-    for loss_name, loss_value in errors.items():
-        msg += f', {loss_name}={loss_value:.4f}'
-        values_to_log[loss_name] = loss_value
+        for loss_name, loss_value in errors.items():
+            msg += f', {loss_name}={loss_value:.4f}'
+            values_to_log[loss_name] = loss_value
 
-end_inference = time.time()
-inference_time = end_inference - start_inference
-msg += f', inference_time={inference_time:.4f}'
-print(msg)
+    end_inference = time.time()
+    inference_time = end_inference - start_inference
+    msg += f', inference_time={inference_time:.4f}'
+    print(msg)
+    print('Size of model before quantization (MB): ', get_size_of_model(model))
+    print()
+
+#time dynamic quantization model, eager mode
+for _ in range(3):
+    print('Time dynamic quantization model, eager mode')
+    msg = f'[{model_load_epoch}]'
+    model_to_optimize = copy.deepcopy(model)
+    model_int8 = torch.ao.quantization.quantize_dynamic(model_to_optimize, {torch.nn.Linear}, dtype=torch.qint8)
+    model_int8 = model_int8.to(device)
+    start_inference = time.time()
+    for loader_name, loader in test_loaders.items():
+
+        errors = trainer.evaluate(model_int8, eval_losses, loader, output_encoder, log_prefix=loader_name)
+
+        for loss_name, loss_value in errors.items():
+            msg += f', {loss_name}={loss_value:.4f}'
+            values_to_log[loss_name] = loss_value
+
+    end_inference = time.time()
+    inference_time = end_inference - start_inference
+    msg += f', inference_time={inference_time:.4f}'
+    print(msg)
+    print('Size of model after quantization (MB): ', get_size_of_model(model_int8))
+    print()
+
+
+"""
+#time dynamic quantization model, graph mode (fx)
+print('Time dynamic quantization model, graph mode (fx)')
+#get example input from test loader
+example_inputs = next(iter(test_loaders[128]))
 
 msg = f'[{model_load_epoch}]'
-#time quantized model
-model_int8 = torch.ao.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
-model_int8 = model_int8.to(device)
+qconfig = get_default_qconfig_mapping("x86")
+qconfig_mapping = QConfigMapping().set_global(qconfig)
+prepare_custom_config_dict = {
+    # option 1
+    #"non_traceable_module_name": "FactorizedSpectralConv",
+    # option 2
+    "non_traceable_module_class": [FactorizedSpectralConv],
+}
+
+prepare_custom_config = PrepareCustomConfig()
+prepare_custom_config.set_non_traceable_module_classes([FactorizedSpectralConv])
+
+'''
+this line is buggy because of implementation of qconfig_mapping
+'''
+prepared_model = prepare_fx(model, qconfig_mapping, example_inputs,
+                            prepare_custom_config=prepare_custom_config)
+# no calibration is required for dynamic quantization
+model_int8_fx = convert_fx(prepared_model)  # convert the model to a dynamically quantized model
+model_int8_fx = model_int8_fx.to(device)
 start_inference = time.time()
 for loader_name, loader in test_loaders.items():
 
-    errors = trainer.evaluate(model_int8, eval_losses, loader, output_encoder, log_prefix=loader_name)
+    errors = trainer.evaluate(model_int8_fx, eval_losses, loader, output_encoder, log_prefix=loader_name)
 
     for loss_name, loss_value in errors.items():
         msg += f', {loss_name}={loss_value:.4f}'
@@ -189,7 +224,7 @@ end_inference = time.time()
 inference_time = end_inference - start_inference
 msg += f', inference_time={inference_time:.4f}'
 print(msg)
+print('Size of model after quantization (MB): ', get_size_of_model(model_int8_fx))
+print()
+"""
 
-
-if config.wandb.log and is_logger:
-    wandb.finish()
