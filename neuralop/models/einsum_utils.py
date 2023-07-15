@@ -31,7 +31,7 @@ def einsum_complexhalf_two_input(eq, a, b):
 
 def einsum_complexhalf(eq, *args):
     """Compute einsum for complexhalf tensors"""
-    optimized = False
+    optimized = True
     if optimized:
         return einsum_complexhalf_optimized(eq, *args)
 
@@ -80,15 +80,13 @@ def einsum_complexhalf(eq, *args):
 
 def einsum_complexhalf_optimized(eq, *args):
     """
-    Optimized version of einsum_complexhalf.
+    Optimized version of einsum_complexhalf, specific to 2d Navier Stokes with cp factorization
     """
     if len(args) == 2:
         # if there are two inputs, it is faster to call this method
         return einsum_complexhalf_two_input(eq, *args)
 
-    # find the optimal path
-    _, path_info = opt_einsum.contract_path(eq, *args)
-    #partial_eqns = [contraction_info[2] for contraction_info in path_info.contraction_list]
+    # hard-coded optimal path
     partial_eqns = ['ce,e->ce', 'de,be->deb', 'ce,fe->cef', 'cef,deb->cfdb', 'cfdb,abcd->afcd']
 
     # create a dict of the input tensors by their label in the einsum equation
@@ -101,34 +99,24 @@ def einsum_complexhalf_optimized(eq, *args):
     tensors['abcd'] = torch.view_as_real(tensors['abcd'])
     tensors['abcd'] = tensors['abcd'].half()
 
-    for partial_eq in partial_eqns:        
+    for partial_eq in partial_eqns:
         # get the input tensors to partial_eq
         in_labels, out_label = partial_eq.split('->')
         in_labels = in_labels.split(',')
         in_tensors = [tensors[label] for label in in_labels]
 
-        # ['abcd', 'e', 'be', 'fe', 'ce', 'de']
-        # all ['ce,e->ce', 'de,be->deb', 'ce,fe->cef', 'cef,deb->cfdb', 'cfdb,abcd->afcd']
-        # complex ['ce,e->ce', 'de,be->deb', 'ce,fe->cef']
-
-        # at first, abcd goes to real, and ce, e, de, be, fe stay complex
-        # ce,e complex, ce stays complex
-        # de,be complex but deb real
-        # ce,fe complex but cef real
-
-        # well this didn't work. The best solution is 1.60, and it is by keeping the full for loop that
-        # converts everything to view_as_real and half. And then, for these three einsums, convert to view_as_complex
-        # and back to view_as_real at the end.
-        # I tried to cut out most of the view_as conversinos, but it didn't help.
-
         if partial_eq in ['ce,e->ce', 'de,be->deb', 'ce,fe->cef']:
+            # these are the einsums that work with the complexhalf dtype
             in_tensors[0], in_tensors[1] = in_tensors[0].chalf(), in_tensors[1].chalf()
             tmp = tl.einsum(partial_eq, *in_tensors)
             if partial_eq == 'ce,e->ce':
+                # the next einsum will run in complexhalf dtype
                 tensors[out_label] = tmp
             else:
+                # the next equation will run in half dtype
                 tensors[out_label] = torch.view_as_real(tmp)
         else:
+            # these are the einsums that do not work with the complexhalf dtype
             #cef,deb->cfdb and cfdb,abcd->afcd
 
             # create new einsum equation that takes into account "view as real" form
