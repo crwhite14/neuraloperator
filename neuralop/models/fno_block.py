@@ -101,13 +101,6 @@ class FNOBlocks(nn.Module):
             self.norm = nn.ModuleList([nn.LayerNorm([64, 128, 128], elementwise_affine=False) for _ in range(n_layers*self.n_norms)])
         else:
             raise ValueError(f'Got {norm=} but expected None or one of [instance_norm, group_norm, layer_norm]')
-        
-        '''
-        self.norm = nn.ModuleList([nn.GroupNorm(num_groups=1, num_channels=self.out_channels), nn.GroupNorm(num_groups=64, num_channels=self.out_channels),
-                                nn.GroupNorm(num_groups=1, num_channels=self.out_channels), nn.GroupNorm(num_groups=4, num_channels=self.out_channels),
-                                nn.GroupNorm(num_groups=1, num_channels=self.out_channels), nn.GroupNorm(num_groups=2, num_channels=self.out_channels),
-                                nn.GroupNorm(num_groups=64, num_channels=self.out_channels), nn.GroupNorm(num_groups=64, num_channels=self.out_channels)])
-        '''
 
     def forward(self, x, index=0):
         
@@ -125,7 +118,6 @@ class FNOBlocks(nn.Module):
             x_skip_mlp = self.mlp_skips[index](x)
             if self.convs.output_scaling_factor is not None:
                 x_skip_mlp = resample(x_skip_mlp, self.convs.output_scaling_factor, list(range(-len(self.convs.output_scaling_factor), 0)))
-
         x_fno = self.convs(x, index)
 
         if not self.preactivation and self.norm is not None:

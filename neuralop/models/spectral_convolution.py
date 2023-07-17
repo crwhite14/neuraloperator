@@ -279,7 +279,6 @@ class FactorizedSpectralConv(nn.Module):
                 #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, int(1092 - 100*((2*n_layers-1-i)//2)))
                 #print('rank', rank, i, i//2, int(1092 - 100*(i//2)))
 
-
             self.weight = nn.ModuleList([
                  FactorizedTensor.new(
                     weight_shape,
