@@ -388,7 +388,7 @@ class Trainer:
 
         return 
 
-    def load_model_checkpoint(self, epoch, model, optimizer):
+    def load_model_checkpoint(self, epoch, model, optimizer, load_path=None):
         """Loads a model checkpoint
         
         Parameters
@@ -398,10 +398,11 @@ class Trainer:
         model : model to load
         optimizer : optimizer to load
         """
-        if epoch == -1:
-            load_path = os.path.join(self.model_save_dir, f'checkpoint_best.pt')
-        else:
-            load_path = os.path.join(self.model_save_dir, f'checkpoint_{epoch}.pt')
+        if not load_path:
+            if epoch == -1:
+                load_path = os.path.join(self.model_save_dir, f'checkpoint_best.pt')
+            else:
+                load_path = os.path.join(self.model_save_dir, f'checkpoint_{epoch}.pt')
         checkpoint = torch.load(load_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])

@@ -25,7 +25,7 @@ default: &DEFAULT
     lifting_channels: 256
     projection_channels: 256
     incremental_n_modes: None
-    n_layers: 4
+    n_layers: 8
     domain_padding: None #0.078125
     domain_padding_mode: 'one-sided'
     fft_norm: 'forward'
@@ -69,7 +69,7 @@ default: &DEFAULT
     # folder: '/home/nikola/HDD/NavierStokes/2D'
     folder: '/home/ubuntu/data/navier_stokes/'
     # folder: '/data'
-    batch_size: 64
+    batch_size: 32
     n_train: 10000
     train_resolution: 128
     n_tests: [2000] #, 1000]
@@ -91,7 +91,7 @@ default: &DEFAULT
 
   # Weights and biases
   wandb:
-    log: True
+    log: False
     name: None # If None, config will be used but you can override it here
     group: 'neuraloperator' 
     project: "lowprecision"

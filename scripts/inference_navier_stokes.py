@@ -15,12 +15,12 @@ from neuralop.models.spectral_convolution import FactorizedSpectralConv
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from torch.ao.quantization import QConfigMapping
-from torch.ao.quantization.qconfig_mapping import get_default_qconfig_mapping
-from torch.ao.quantization.fx.custom_config import PrepareCustomConfig
+#from torch.ao.quantization import QConfigMapping
+#from torch.ao.quantization.qconfig_mapping import get_default_qconfig_mapping
+#from torch.ao.quantization.fx.custom_config import PrepareCustomConfig
 
 # Note that this is temporary, we'll expose these functions to torch.ao.quantization after official releasee
-from torch.quantization.quantize_fx import prepare_fx, convert_fx
+#from torch.quantization.quantize_fx import prepare_fx, convert_fx
 
 # ignore complexhalf warnings
 import warnings
@@ -49,7 +49,7 @@ def replace_layers(model, old, new):
 config_name = 'default'
 #config_folder = os.path.join(get_project_root(), 'config')
 config_folder = os.path.join('..', 'config')
-config_file_name = 'factorized_config_renbo.yaml'
+config_file_name = 'load_8layer_config.yaml'
 
 pipe = ConfigPipeline([YamlConfig(config_file_name, config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),
@@ -132,7 +132,9 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
 
 # load model from dict
 model_load_epoch = -1
-trainer.load_model_checkpoint(model_load_epoch, model, optimizer)
+file_path = 'checkpoint_best_2023-07-18.pt'
+load_path = 'saved_checkpoints/' + file_path
+trainer.load_model_checkpoint(model_load_epoch, model, optimizer, load_path=load_path)
 
 #GPU warm-up
 print('GPU warm-up')
@@ -159,6 +161,8 @@ for _ in range(3):
     print(msg)
     print('Size of model before quantization (MB): ', get_size_of_model(model))
     print()
+
+# todo: end here?
 
 #time dynamic quantization model, eager mode
 for _ in range(3):
