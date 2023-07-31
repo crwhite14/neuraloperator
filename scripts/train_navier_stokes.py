@@ -12,13 +12,17 @@ from neuralop import LpLoss, H1Loss
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+torch.backends.cuda.matmul.allow_tf32 = False
+
+# The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
+torch.backends.cudnn.allow_tf32 = False
 
 # Read the configuration
 config_name = 'default'
 #config_folder = os.path.join(get_project_root(), 'config')
 config_folder = os.path.join('..', 'config')
 
-config_file_name = 'factorized_config_renbo.yaml'
+config_file_name = 'factorized_config.yaml'
 
 pipe = ConfigPipeline([YamlConfig(config_file_name, config_name=config_name, config_folder=config_folder),
                        ArgparseConfig(infer_types=True, config_name=None, config_file=None),

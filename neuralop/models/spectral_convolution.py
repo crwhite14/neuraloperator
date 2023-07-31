@@ -58,7 +58,6 @@ def _contract_cp(x, cp_weight, separable=False):
         factor_syms = [einsum_symbols[1]+rank_sym,out_sym+rank_sym] #in, out
     factor_syms += [xs+rank_sym for xs in x_syms[2:]] #x, y, ...
     eq = x_syms + ',' + rank_sym + ',' + ','.join(factor_syms) + '->' + ''.join(out_syms)
-
     if x.dtype == torch.complex32:
         return einsum_complexhalf(eq, x, cp_weight.weights, *cp_weight.factors)
     else:
@@ -347,13 +346,14 @@ class FactorizedSpectralConv(nn.Module):
         
         #Compute Fourier coeffcients
         fft_dims = list(range(-self.order, 0))
-
         if self.half_prec_fourier:
-            x = x.half()
+            x = x.half() #0.193 w/ float
         else:
-            x.float()
+            #x.float()
+            pass
+        #mem1 = torch.cuda.memory_allocated(0)/1e9
 
-        if self.stabilizer == 'tanh':
+        if self.stabilizer == 'tanh': #does not affect mem
             x = torch.tanh(x)
         elif self.stabilizer == 'clip_hard':
             x = torch.clamp(x, -1, 1) 
@@ -361,7 +361,7 @@ class FactorizedSpectralConv(nn.Module):
             x = self.sigma_clip(x)
         elif self.stabilizer:
             raise ValueError(f'Unknown stabilizer {self.stabilizer}')
-
+        
         if False:
             # save a tensor once every 100 seconds, for debugging purposes
             import os
@@ -376,6 +376,7 @@ class FactorizedSpectralConv(nn.Module):
             # if self.half_prec_fourier, x is already chalf
             x = x.chalf()
 
+        #x = x.cfloat() #0.2434 
         if self.half_prec_inverse or self.half_prec_fourier:
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
         else:
@@ -388,7 +389,6 @@ class FactorizedSpectralConv(nn.Module):
         for i, boundaries in enumerate(itertools.product(*mode_indexing)):
             # Keep all modes for first 2 modes (batch-size and channels)
             idx_tuple = [slice(None), slice(None)] + [slice(*b) for b in boundaries]
-
             # For 2D: [:, :, :height, :width] and [:, :, -height:, width]
             out_fft[idx_tuple] = self._contract(x[idx_tuple], self._get_weight(self.n_weights_per_layer*indices + i), separable=self.separable)
 
@@ -396,9 +396,14 @@ class FactorizedSpectralConv(nn.Module):
             mode_sizes = tuple([int(round(s*r)) for (s, r) in zip(mode_sizes, self.output_scaling_factor)])
 
         x = torch.fft.irfftn(out_fft, s=(mode_sizes), norm=self.fft_norm)
-
         if self.bias is not None:
+            if self.half_prec_fourier or self.half_prec_inverse:
+                self.bias.data = self.bias.data.half()
             x = x + self.bias[indices, ...]
+            #here the bias changes precision to float 32
+        #mem2 = torch.cuda.memory_allocated(0)/1e9
+        #print(mem1, mem2)
+        #print('allocated memory', mem2-mem1)
 
         return x
 

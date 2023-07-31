@@ -103,14 +103,15 @@ class FNOBlocks(nn.Module):
             raise ValueError(f'Got {norm=} but expected None or one of [instance_norm, group_norm, layer_norm]')
 
     def forward(self, x, index=0):
-        
+        #here with half-precision skip, 4.85G (with issues of instability)
         if self.preactivation:
             x = self.non_linearity(x)
 
             if self.norm is not None:
                 x = self.norm[self.n_norms*index](x)
-    
+        
         x_skip_fno = self.fno_skips[index](x)
+        #here before skip_mlp, 5.18G
         if self.convs.output_scaling_factor is not None:
             x_skip_fno = resample(x_skip_fno, self.convs.output_scaling_factor, list(range(-len(self.convs.output_scaling_factor), 0)))
 
@@ -118,11 +119,21 @@ class FNOBlocks(nn.Module):
             x_skip_mlp = self.mlp_skips[index](x)
             if self.convs.output_scaling_factor is not None:
                 x_skip_mlp = resample(x_skip_mlp, self.convs.output_scaling_factor, list(range(-len(self.convs.output_scaling_factor), 0)))
+        #here 5.76G (same as inside conv)
+        start = torch.cuda.memory_allocated()/1e9
+        #x = x.half()
+
+        #x = torch.tanh(x)
         x_fno = self.convs(x, index)
+
+        end = torch.cuda.memory_allocated()/1e9
+        print(f'Layer {index} used {end-start} GB of memory')
 
         if not self.preactivation and self.norm is not None:
             x_fno = self.norm[self.n_norms*index](x_fno)
-    
+        if self.training:
+            x_fno = x_fno.half()
+
         x = x_fno + x_skip_fno
 
         if not self.preactivation and (self.mlp is not None) or (index < (self.n_layers - index)):
@@ -141,6 +152,8 @@ class FNOBlocks(nn.Module):
             x = self.mlp[index](x) + x_skip_mlp
 
             if not self.preactivation and self.norm is not None:
+                if self.training:
+                    x = x.half()
                 x = self.norm[self.n_norms*index+1](x)
 
             if not self.preactivation:

@@ -4,6 +4,7 @@ import time
 from tensorly import tenalg
 tenalg.set_backend('einsum')
 from pathlib import Path
+from torch.cuda import amp
 
 from configmypy import ConfigPipeline, YamlConfig, ArgparseConfig
 from neuralop import get_model
@@ -29,10 +30,19 @@ model = model.to(device)
 
 in_data = torch.randn(batch_size, 3, size, size).to(device)
 print(model.__class__)
-print(model)
+#print(model)
 
 t1 = time.time()
-out = model(in_data)
+start_mem = torch.cuda.memory_allocated()/1e9
+
+if config.opt.amp_autocast:
+    print('Using autocast.')
+    with amp.autocast(enabled=True):
+        out = model(in_data)
+else:
+    out = model(in_data)
+end_mem = torch.cuda.memory_allocated()/1e9
+print(f'Memory usage: {end_mem-start_mem} GB')
 t = time.time() - t1
 print(f'Output of size {out.shape} in {t}.')
 
