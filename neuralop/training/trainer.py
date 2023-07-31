@@ -190,22 +190,11 @@ class Trainer:
                         y = y.view(y.shape[0], 1, y.shape[1])
                     loss = training_loss(out.float(), y)
 
-                #second measurement
-                if measure_gpu:
-                    gpu_mem_used, _ , gpu_util = get_gpu_usage()
-                    GPU_memory_meter_micro.update(gpu_mem_used)
-                    GPU_util_meter_micro.update(gpu_util)
 
                 if regularizer:
                     loss += regularizer.loss
 
                 loss.backward()
-
-                #third measurement
-                if measure_gpu:
-                    gpu_mem_used, _ , gpu_util = get_gpu_usage()
-                    GPU_memory_meter_micro.update(gpu_mem_used)
-                    GPU_util_meter_micro.update(gpu_util)
 
                 if self.grad_clip:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=self.grad_clip)
