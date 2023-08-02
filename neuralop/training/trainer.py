@@ -5,14 +5,14 @@ from timeit import default_timer
 import wandb
 import sys
 import os
+import pandas as pd
 from datetime import datetime
 
 import neuralop.mpu.comm as comm
 
 from .patching import MultigridPatching2D
 from .losses import LpLoss
-from .utils import AverageMeter, get_gpu_total_mem, get_gpu_usage
-
+from .utils import AverageMeter, get_gpu_total_mem, get_gpu_usage, get_gpu_memory_map
 
 class Trainer:
     def __init__(self, model, n_epochs, wandb_log=True, amp_autocast=False, grad_clip=False, device=None,
@@ -129,7 +129,6 @@ class Trainer:
         GPU_util_meter_macro = AverageMeter()
         gpu_mem_capacity = get_gpu_total_mem(self.device)
         time_meter = AverageMeter()
-        measure_gpu = True
 
         for epoch in range(self.n_epochs):
             avg_loss = 0
@@ -139,6 +138,7 @@ class Trainer:
             train_err = 0.0
             GPU_memory_meter_micro = AverageMeter()
             GPU_util_meter_micro = AverageMeter()
+            measure_gpu = True
 
             for idx, sample in enumerate(train_loader):
                 x, y = sample['x'], sample['y']
@@ -164,11 +164,16 @@ class Trainer:
                 else:
                     out = model(x)
 
-                #first measurement
                 if measure_gpu:
                     gpu_mem_used, gpu_memory_max , gpu_util = get_gpu_usage(self.device)
                     GPU_memory_meter_micro.update(gpu_mem_used)
                     GPU_util_meter_micro.update(gpu_util)
+                    current_pid = os.getpid()
+                    df = get_gpu_memory_map()
+                    memory_used = df[df['pid'] == current_pid]['memory.used [MiB]'].values[0]
+                    print(f"Memory used by current process: {memory_used} MiB")
+                    measure_gpu = False
+
 
                 if epoch == 0 and idx == 0 and self.verbose and is_logger:
                     print(f'Raw outputs of size {out.shape=}')
@@ -214,7 +219,7 @@ class Trainer:
 
             epoch_train_time = default_timer() - t1
             time_meter.update(epoch_train_time)
-            if measure_gpu:
+            if True:
                 _, max_memory, _ = get_gpu_usage(self.device)
                 GPU_memory_meter_macro.update(max_memory)
                 GPU_util_meter_macro.update(GPU_util_meter_micro.avg)

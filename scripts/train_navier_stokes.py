@@ -12,6 +12,10 @@ from neuralop import LpLoss, H1Loss
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+torch.backends.cuda.matmul.allow_tf32 = False
+
+# The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
+torch.backends.cudnn.allow_tf32 = False
 
 # Read the configuration
 config_name = 'default'

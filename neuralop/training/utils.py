@@ -1,6 +1,7 @@
 import subprocess
 import time
 import torch
+import pandas as pd
 
 class AverageMeter():
     """Computes and stores the average and current value"""
@@ -29,17 +30,18 @@ def get_gpu_usage(device):
 def get_gpu_total_mem(device):
     return torch.cuda.get_device_properties(device).total_memory / 1024**3
 
-def get_gpu_memory_and_utilization():
-    # this hangs during the training loop because of "subprocess.check_output"
+def get_gpu_memory_map():
     result = subprocess.check_output(
         [
-            'nvidia-smi', '--query-gpu=memory.used,memory.total,utilization.gpu',
+            'nvidia-smi', '--query-compute-apps=pid,used_memory', 
             '--format=csv,nounits,noheader'
         ], encoding='utf-8')
-    # Parse output
-    gpu_memory_used, gpu_memory_total, gpu_utilization = result.strip().split(',')
-    #gpu_memory_used_pct = float(gpu_memory_used) / float(gpu_memory_total)
-    return int(gpu_memory_used), int(gpu_memory_total), int(gpu_utilization)
+    # Convert lines into a dataframe
+    df = pd.DataFrame([x.split(',') for x in result.strip().split('\n')], 
+                      columns=['pid', 'memory.used [MiB]'])
+    df['pid'] = df['pid'].apply(int)
+    df['memory.used [MiB]'] = df['memory.used [MiB]'].apply(int)
+    return df
 
 if __name__ == '__main__':
     #test utilization acquisition
