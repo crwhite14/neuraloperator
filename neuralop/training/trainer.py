@@ -127,7 +127,7 @@ class Trainer:
 
         GPU_memory_meter_macro = AverageMeter()
         GPU_util_meter_macro = AverageMeter()
-        gpu_mem_capacity = get_gpu_total_mem()
+        gpu_mem_capacity = get_gpu_total_mem(self.device)
         time_meter = AverageMeter()
         measure_gpu = True
 
@@ -166,7 +166,7 @@ class Trainer:
 
                 #first measurement
                 if measure_gpu:
-                    gpu_mem_used, _ , gpu_util = get_gpu_usage()
+                    gpu_mem_used, gpu_memory_max , gpu_util = get_gpu_usage(self.device)
                     GPU_memory_meter_micro.update(gpu_mem_used)
                     GPU_util_meter_micro.update(gpu_util)
 
@@ -214,8 +214,10 @@ class Trainer:
 
             epoch_train_time = default_timer() - t1
             time_meter.update(epoch_train_time)
-            GPU_memory_meter_macro.update(GPU_memory_meter_micro.avg)
-            GPU_util_meter_macro.update(GPU_util_meter_micro.avg)
+            if measure_gpu:
+                _, max_memory, _ = get_gpu_usage(self.device)
+                GPU_memory_meter_macro.update(max_memory)
+                GPU_util_meter_macro.update(GPU_util_meter_micro.avg)
 
             del x, y
 

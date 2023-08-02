@@ -20,13 +20,13 @@ class AverageMeter():
         self.avg = self.sum / self.count
 
 # Assuming using GPU 0
-device = torch.device('cuda:0')
+# device = torch.device('cuda:0')
 
-def get_gpu_usage():
+def get_gpu_usage(device):
     #requires pynvml for this to work
-    return torch.cuda.memory_allocated(device) / 1024**3 , torch.cuda.memory_reserved(device) / 1024**3 , torch.cuda.utilization(device)
+    return torch.cuda.memory_allocated(device) / 1024**3 , torch.cuda.max_memory_allocated(device) / 1024**3 , torch.cuda.utilization(device)
 
-def get_gpu_total_mem():
+def get_gpu_total_mem(device):
     return torch.cuda.get_device_properties(device).total_memory / 1024**3
 
 def get_gpu_memory_and_utilization():
