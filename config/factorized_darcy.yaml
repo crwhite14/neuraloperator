@@ -26,7 +26,8 @@ default: &DEFAULT
     domain_padding_mode: 'one-sided' #symmetric
     fft_norm: 'forward'
     norm: 'group_norm'
-    skip: 'linear'
+    fno_skip: 'linear'
+    mlp_skip: 'soft-gating'
     implementation: 'factorized'
     separable: 0
     preactivation: 0

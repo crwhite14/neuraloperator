@@ -7,12 +7,14 @@ import sys
 import os
 import pandas as pd
 from datetime import datetime
+import pandas as pd
 
 import neuralop.mpu.comm as comm
 
 from .patching import MultigridPatching2D
 from .losses import LpLoss
 from .utils import AverageMeter, get_gpu_total_mem, get_gpu_usage, get_gpu_memory_map
+
 
 class Trainer:
     def __init__(self, model, n_epochs, wandb_log=True, amp_autocast=False, grad_clip=False, device=None,
@@ -129,7 +131,8 @@ class Trainer:
         GPU_util_meter_macro = AverageMeter()
         gpu_mem_capacity = get_gpu_total_mem(self.device)
         time_meter = AverageMeter()
-
+        measure_gpu = True
+        scaler = GradScaler(enabled=self.amp_autocast) 
         for epoch in range(self.n_epochs):
             avg_loss = 0
             avg_lasso_loss = 0
@@ -164,8 +167,9 @@ class Trainer:
                 else:
                     out = model(x)
 
-                if measure_gpu:
-                    gpu_mem_used, gpu_memory_max , gpu_util = get_gpu_usage(self.device)
+                #first measurement
+                if measure_gpu and idx > 10:
+                    gpu_mem_used, gpu_memory_max , gpu_util = get_gpu_usage()
                     GPU_memory_meter_micro.update(gpu_mem_used)
                     GPU_util_meter_micro.update(gpu_util)
                     current_pid = os.getpid()
@@ -173,7 +177,6 @@ class Trainer:
                     memory_used = df[df['pid'] == current_pid]['memory.used [MiB]'].values[0]
                     print(f"Memory used by current process: {memory_used} MiB")
                     measure_gpu = False
-
 
                 if epoch == 0 and idx == 0 and self.verbose and is_logger:
                     print(f'Raw outputs of size {out.shape=}')
@@ -195,16 +198,16 @@ class Trainer:
                         y = y.view(y.shape[0], 1, y.shape[1])
                     loss = training_loss(out.float(), y)
 
-
                 if regularizer:
                     loss += regularizer.loss
 
                 loss.backward()
 
+
                 if self.grad_clip:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=self.grad_clip)
                 optimizer.step()
-
+                
                 train_err += loss.item()
         
                 with torch.no_grad():
@@ -219,10 +222,10 @@ class Trainer:
 
             epoch_train_time = default_timer() - t1
             time_meter.update(epoch_train_time)
-            if True:
-                _, max_memory, _ = get_gpu_usage(self.device)
-                GPU_memory_meter_macro.update(max_memory)
-                GPU_util_meter_macro.update(GPU_util_meter_micro.avg)
+            _, gpu_max_mem, _ = get_gpu_usage()
+            GPU_memory_meter_macro.update(gpu_max_mem)
+            GPU_util_meter_macro.update(GPU_util_meter_micro.avg)
+            measure_gpu = True
 
             del x, y
 
