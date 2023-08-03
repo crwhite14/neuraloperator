@@ -397,8 +397,8 @@ class FactorizedSpectralConv(nn.Module):
 
         x = torch.fft.irfftn(out_fft, s=(mode_sizes), norm=self.fft_norm)
         if self.bias is not None:
-            if self.half_prec_fourier or self.half_prec_inverse:
-                self.bias.data = self.bias.data.half()
+            #if self.half_prec_fourier or self.half_prec_inverse:
+            #    self.bias.data = self.bias.data.half()
             x = x + self.bias[indices, ...]
             #here the bias changes precision to float 32
         #mem2 = torch.cuda.memory_allocated(0)/1e9

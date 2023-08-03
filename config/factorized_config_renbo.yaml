@@ -31,10 +31,11 @@ default: &DEFAULT
     domain_padding_mode: 'one-sided'
     fft_norm: 'forward'
     norm: 'group_norm'
-    skip: 'linear'
+    fno_skip: 'linear'
+    mlp_skip: 'soft-gating'
     half_prec_fourier: False
     half_prec_inverse: True
-    stabilizer: 'tanh'
+    stabilizer: None
 
     use_mlp: 1
     mlp:

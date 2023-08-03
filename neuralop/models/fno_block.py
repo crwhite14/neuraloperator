@@ -76,7 +76,6 @@ class FNOBlocks(nn.Module):
                 joint_factorization=joint_factorization,
                 n_layers=n_layers,
             )
-
         self.fno_skips = nn.ModuleList([skip_connection(self.in_channels, self.out_channels, type=fno_skip, n_dim=self.n_dim) for _ in range(n_layers)])
 
         if use_mlp:
@@ -127,12 +126,12 @@ class FNOBlocks(nn.Module):
         x_fno = self.convs(x, index)
 
         end = torch.cuda.memory_allocated()/1e9
-        print(f'Layer {index} used {end-start} GB of memory')
+        #print(f'Layer {index} used {end-start} GB of memory')
 
         if not self.preactivation and self.norm is not None:
             x_fno = self.norm[self.n_norms*index](x_fno)
-        if self.training:
-            x_fno = x_fno.half()
+        #if self.training:
+            #x_fno = x_fno.half()
 
         x = x_fno + x_skip_fno
 
@@ -152,10 +151,9 @@ class FNOBlocks(nn.Module):
             x = self.mlp[index](x) + x_skip_mlp
 
             if not self.preactivation and self.norm is not None:
-                if self.training:
-                    x = x.half()
                 x = self.norm[self.n_norms*index+1](x)
-
+                #if self.training:
+                    #x = x.half()
             if not self.preactivation:
                 if index < (self.n_layers - 1):
                     x = self.non_linearity(x)
