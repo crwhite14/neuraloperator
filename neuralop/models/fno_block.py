@@ -121,8 +121,6 @@ class FNOBlocks(nn.Module):
 
         if not self.preactivation and self.norm is not None:
             x_fno = self.norm[self.n_norms*index](x_fno)
-        if self.training:
-            x_fno = x_fno.half()
 
         x = x_fno + x_skip_fno
 
@@ -143,8 +141,7 @@ class FNOBlocks(nn.Module):
 
             if not self.preactivation and self.norm is not None:
                 x = self.norm[self.n_norms*index+1](x)
-                #if self.training:
-                    #x = x.half()
+
             if not self.preactivation:
                 if index < (self.n_layers - 1):
                     x = self.non_linearity(x)
