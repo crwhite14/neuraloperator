@@ -169,7 +169,7 @@ class Trainer:
 
                 #first measurement
                 if measure_gpu and idx > 10:
-                    gpu_mem_used, gpu_memory_max , gpu_util = get_gpu_usage()
+                    gpu_mem_used, gpu_memory_max , gpu_util = get_gpu_usage(self.device)
                     GPU_memory_meter_micro.update(gpu_mem_used)
                     GPU_util_meter_micro.update(gpu_util)
                     current_pid = os.getpid()
@@ -222,7 +222,7 @@ class Trainer:
 
             epoch_train_time = default_timer() - t1
             time_meter.update(epoch_train_time)
-            _, gpu_max_mem, _ = get_gpu_usage()
+            _, gpu_max_mem, _ = get_gpu_usage(self.device)
             GPU_memory_meter_macro.update(gpu_max_mem)
             GPU_util_meter_macro.update(GPU_util_meter_micro.avg)
             measure_gpu = True
@@ -290,7 +290,7 @@ class Trainer:
                 self.save_model_checkpoint(-1, model, optimizer)
                 if self.wandb_log and is_logger:
                     datestr = datetime.today().strftime('%Y-%m-%d')
-                    save_path = os.path.join(self.model_save_dir, f'checkpoint_last_{datestr}.pt')
+                    save_path = os.path.join(self.model_save_dir, f'checkpoint_best_{datestr}.pt')
                     wandb.save(save_path)
                 
         return 
