@@ -149,6 +149,7 @@ trainer = Trainer(model, n_epochs=config.opt.n_epochs,
                   log_test_interval=config.wandb.log_test_interval,
                   log_output=config.wandb.log_output,
                   use_distributed=config.distributed.use_distributed,
+                  save_interval=config.wandb.save_interval,
                   verbose=config.verbose)
 
 

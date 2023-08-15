@@ -163,6 +163,7 @@ class FNO(nn.Module):
         else:
             self.domain_padding = None
         self.domain_padding_mode = domain_padding_mode
+        self.half_prec_fourier = half_prec_fourier
 
         self.fno_blocks = FNOBlocks(
             in_channels=hidden_channels,
@@ -201,6 +202,8 @@ class FNO(nn.Module):
             x = self.domain_padding.pad(x)
 
         for layer_idx in range(self.n_layers):
+            if self.training and self.half_prec_fourier:
+                x = x.half()
             x = self.fno_blocks(x, layer_idx)
 
         if self.domain_padding is not None:

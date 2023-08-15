@@ -27,14 +27,14 @@ default: &DEFAULT
     projection_channels: 256
     incremental_n_modes: None
     n_layers: 8
-    domain_padding: None #0.078125
+    domain_padding: None
     domain_padding_mode: 'one-sided'
     fft_norm: 'forward'
     norm: 'group_norm'
     fno_skip: 'linear'
     mlp_skip: 'soft-gating'
     half_prec_fourier: False
-    half_prec_inverse: True
+    half_prec_inverse: False
     stabilizer: None
 
     use_mlp: 1
@@ -56,7 +56,7 @@ default: &DEFAULT
     learning_rate: 1e-3
     training_loss: 'h1'
     weight_decay: 1e-4
-    amp_autocast: True
+    amp_autocast: False
     grad_clip: False # either False/0, or a float that is the max norm of the gradients
     precision_schedule: None
 
@@ -68,11 +68,10 @@ default: &DEFAULT
 
   # Dataset related
   data:
-    # folder: '/home/nikola/HDD/NavierStokes/2D' 
+    dataset: 'navier_stokes'
     folder: '/home/renbo/Desktop/New-Ops/neuraloperator/neuralop/datasets/data/'
-    # folder: '/data'
     batch_size: 32
-    n_train: 500
+    n_train: 10000
     train_resolution: 128
     n_tests: [2000] #, 1000]
     test_resolutions: [128] #, 1024] 
@@ -93,7 +92,7 @@ default: &DEFAULT
 
   # Weights and biases
   wandb:
-    log: False
+    log: True
     name: 'half-memory-optimized' # If None, config will be used but you can override it here
     group: '' 
     project: "fno"
@@ -101,3 +100,4 @@ default: &DEFAULT
     sweep: False
     log_output: True
     log_test_interval: 1
+    save_interval: 10

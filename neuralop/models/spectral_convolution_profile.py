@@ -1,6 +1,11 @@
 from torch import nn
 import torch
 import itertools
+import numpy as np
+
+
+start = torch.cuda.Event(enable_timing=True)
+end = torch.cuda.Event(enable_timing=True)
 
 import tensorly as tl
 from tensorly.plugins import use_opt_einsum
@@ -9,9 +14,9 @@ tl.set_backend('pytorch')
 use_opt_einsum('optimal')
 
 from tltorch.factorized_tensors.core import FactorizedTensor
+from .einsum_utils import einsum_complexhalf
 
 einsum_symbols = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-
 
 def _contract_dense(x, weight, separable=False):
     order = tl.ndim(x)
@@ -35,7 +40,7 @@ def _contract_dense(x, weight, separable=False):
         weight = weight.to_tensor()
 
     if x.dtype == torch.complex32:
-        return _einsum_complex(eq, x, weight)
+        return einsum_complexhalf(eq, x, weight)
     else:
         return tl.einsum(eq, x, weight)
 
@@ -59,7 +64,11 @@ def _contract_cp(x, cp_weight, separable=False):
     factor_syms += [xs+rank_sym for xs in x_syms[2:]] #x, y, ...
     eq = x_syms + ',' + rank_sym + ',' + ','.join(factor_syms) + '->' + ''.join(out_syms)
 
-    return tl.einsum(eq, x, cp_weight.weights, *cp_weight.factors)
+    if x.dtype == torch.complex32:
+        return einsum_complexhalf(eq, x, cp_weight.weights, *cp_weight.factors)
+    else:
+        return tl.einsum(eq, x, cp_weight.weights, *cp_weight.factors)
+ 
 
 def _contract_tucker(x, tucker_weight, separable=False):
     order = tl.ndim(x)
@@ -187,7 +196,7 @@ class FactorizedSpectralConv(nn.Module):
                  n_layers=1, separable=False, output_scaling_factor=None, half_prec_fourier=False,
                  stabilizer=None, rank=0.5, factorization='cp', implementation='reconstructed', 
                  fixed_rank_modes=False, joint_factorization=False, decomposition_kwargs=dict(),
-                 init_std='auto', fft_norm='backward'):
+                 init_std='auto', fft_norm='backward', half_prec_inverse=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -216,7 +225,8 @@ class FactorizedSpectralConv(nn.Module):
         self.n_layers = n_layers
         self.implementation = implementation
         self.half_prec_fourier = half_prec_fourier
-        if stabilizer is not None and stabilizer not in ['full_fft', 'clip_hard', 'clip_sigma', 'interpolation']:
+        self.half_prec_inverse = half_prec_inverse
+        if stabilizer is not None and stabilizer not in ['full_fft', 'clip_hard', 'clip_sigma', 'interpolation', 'tanh', 'div_by_mil']:
             raise ValueError(f'Got {stabilizer=}, expected None, "full_fft", "clip_hard", "clip_sigma" or "interpolation"')
         self.stabilizer = stabilizer 
 
@@ -255,19 +265,35 @@ class FactorizedSpectralConv(nn.Module):
 
         self.n_weights_per_layer = 2**(self.order-1)
         if joint_factorization:
+            # todo: this would also change, for diff rank FNO blocks
             self.weight = FactorizedTensor.new((self.n_weights_per_layer*n_layers, *weight_shape),
                                                 rank=self.rank, factorization=factorization, 
                                                 fixed_rank_modes=fixed_rank_modes,
                                                 **decomposition_kwargs)
             self.weight.normal_(0, init_std)
         else:
+            # todo: this code can be made more clean:
+            # The rank can be a list in the config file 
+            # not using list comprehension for ModuleList will make the code cleaner
+            # also, the rank schedule is currently hand-picked for 8 layers, 2 weights per layer
+
+            # for debugging:
+            #for i in range(self.n_weights_per_layer*n_layers):
+                #print('rank', rank, i, i//2, 1.3**(i//2), int(self.rank / 1.3**(i//2)))
+                #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, 1.3**((2*n_layers-1-i)//2), int(self.rank / 1.3**((2*n_layers-1-i)//2)))
+                #print('rank', rank, i, (2*n_layers-1-i), (2*n_layers-1-i)//2, int(1092 - 100*((2*n_layers-1-i)//2)))
+                #print('rank', rank, i, i//2, int(1092 - 100*(i//2)))
+
             self.weight = nn.ModuleList([
                  FactorizedTensor.new(
                     weight_shape,
-                    rank=self.rank, factorization=factorization, 
+                    rank=rank, # fixed rank (original)
+                    #rank=int(1092 - 100*((2*n_layers-1-i)//2)), # ascending from 792 to 1092 
+                    #rank=int(1092 - 100*(i//2)), # descending from 1092 to 792
+                    factorization=factorization, 
                     fixed_rank_modes=fixed_rank_modes,
                     **decomposition_kwargs
-                    ) for _ in range(self.n_weights_per_layer*n_layers)]
+                    ) for i in range(self.n_weights_per_layer*n_layers)]
                 )
             for w in self.weight:
                 w.normal_(0, init_std)
@@ -328,46 +354,57 @@ class FactorizedSpectralConv(nn.Module):
         fft_dims = list(range(-self.order, 0))
 
         if self.half_prec_fourier:
-            # use half precision for FFT, multiplication, inverse-FFT
-            if self.stabilizer is None:
-                x = x.half()
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
+            x = x.half()
+        else:
+            x.float()
 
-            elif self.stabilizer == 'full_fft':
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-                x = x.type(torch.complex32)
+        if self.stabilizer == 'tanh':
+            x = torch.tanh(x)
+        elif self.stabilizer == 'clip_hard':
+            x = torch.clamp(x, -1, 1) 
+        elif self.stabilizer == 'clip_sigma':
+            x = self.sigma_clip(x)
+        elif self.stabilizer:
+            raise ValueError(f'Unknown stabilizer {self.stabilizer}')
 
-            elif self.stabilizer == 'clip_hard':
-                x = x.half()
-                x = torch.clamp(x, -1, 1)
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-            
-            elif self.stabilizer == 'clip_sigma':
-                x = x.half()
-                x = self.sigma_clip(x)
-                x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
-            
-            elif self.stabilizer == 'interpolation':
-                raise NotImplementedError('Interpolation is not implemented yet')
+        if False:
+            # save a tensor once every 100 seconds, for debugging purposes
+            import os
+            import time
+            number = int((time.time() - 1686803530)/100)
+            tensor_name = 'tensor_{}.pt'.format(number)
+            if not os.path.exists(tensor_name):
+                torch.save(x, tensor_name)
+        x = torch.fft.rfftn(x, norm=self.fft_norm, dim=fft_dims)
 
-            else:
-                raise ValueError(f'Unknown stabilizer {self.stabilizer}')
+        if self.half_prec_inverse:
+            # if self.half_prec_fourier, x is already chalf
+            x = x.chalf()
 
+        if self.half_prec_inverse or self.half_prec_fourier:
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.chalf)
         else:
-            x = torch.fft.rfftn(x.float(), norm=self.fft_norm, dim=fft_dims)
             out_fft = torch.zeros([batchsize, self.out_channels, *fft_size], device=x.device, dtype=torch.cfloat)
 
         # We contract all corners of the Fourier coefs
         # Except for the last mode: there, we take all coefs as redundant modes were already removed
         mode_indexing = [((None, m), (-m, None)) for m in self.half_n_modes[:-1]] + [((None, self.half_n_modes[-1]), )]
 
-        for i, boundaries in enumerate(itertools.product(*mode_indexing)):
-            # Keep all modes for first 2 modes (batch-size and channels)
-            idx_tuple = [slice(None), slice(None)] + [slice(*b) for b in boundaries]
+        cumulative_time = 0
+        with torch.autograd.profiler.profile(use_cuda=True) as prf:
+            for i, boundaries in enumerate(itertools.product(*mode_indexing)):
+                # Keep all modes for first 2 modes (batch-size and channels)
+                idx_tuple = [slice(None), slice(None)] + [slice(*b) for b in boundaries]
 
-            # For 2D: [:, :, :height, :width] and [:, :, -height:, width]
-            out_fft[idx_tuple] = self._contract(x[idx_tuple], self._get_weight(self.n_weights_per_layer*indices + i), separable=self.separable)
+                # For 2D: [:, :, :height, :width] and [:, :, -height:, width]
+                #start.record()
+                out_fft[idx_tuple] = self._contract(x[idx_tuple], self._get_weight(self.n_weights_per_layer*indices + i), separable=self.separable)
+                #end.record()
+                #torch.cuda.synchronize()
+                #print(f'Contracting {i} took {np.round(start.elapsed_time(end), 4)} seconds')
+                #cumulative_time = cumulative_time + start.elapsed_time(end)
+            #print('Cumulative time: ', np.round(cumulative_time, 4))
+        print(prf.key_averages().table(sort_by='self_cpu_time_total'))
 
         if self.output_scaling_factor is not None:
             mode_sizes = tuple([int(round(s*r)) for (s, r) in zip(mode_sizes, self.output_scaling_factor)])
