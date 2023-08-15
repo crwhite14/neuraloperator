@@ -1,5 +1,6 @@
 from .tfno import TFNO, TFNO1d, TFNO2d, TFNO3d
 from .tfno import FNO, FNO1d, FNO2d, FNO3d
+from .unet import UNet1d, UNet2d, UNet3d
 import inspect
 
 
@@ -12,6 +13,9 @@ MODEL_ZOO = {
     'fno1d'  : FNO1d,
     'fno2d'  : FNO2d,
     'fno3d'  : FNO3d,
+    'unet1d' : UNet1d,
+    'unet2d' : UNet2d,
+    'unet3d' : UNet3d,
 }
 
 

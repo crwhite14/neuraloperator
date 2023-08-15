@@ -1,0 +1,76 @@
+default: &DEFAULT
+
+  #General
+  # For computing compression
+  n_params_baseline: None #If None, will be computed
+  verbose: True
+  arch: 'unet2d'
+  seed: 123
+
+  #Distributed computing
+  distributed:
+    use_distributed: False
+    wireup_info: 'mpi'
+    wireup_store: 'tcp'
+    model_parallel_size: 2
+
+  # UNet related
+  unet2d:
+    data_channels: 3
+    in_channels: 3
+    out_channels: 1
+    init_features: 64
+
+  # Optimizer
+  opt:
+    n_epochs: 500
+    learning_rate: 1e-3
+    training_loss: 'h1'
+    weight_decay: 1e-4
+    amp_autocast: False
+    grad_clip: False # either False/0, or a float that is the max norm of the gradients
+    precision_schedule: None
+
+    scheduler_T_max: 500 # For cosine only, typically take n_epochs
+    scheduler_patience: 5 # For ReduceLROnPlateau only
+    scheduler: 'StepLR' # Or 'CosineAnnealingLR' OR 'ReduceLROnPlateau'
+    step_size: 100
+    gamma: 0.5
+
+  # Dataset related
+  data:
+    # folder: '/home/nikola/HDD/NavierStokes/2D'
+    folder: '/home/rtu0715/neuraloperator/neuralop/datasets/data/'
+    # folder: '/data'
+    batch_size: 96
+    n_train: 10000
+    train_resolution: 128
+    n_tests: [2000] #, 1000]
+    test_resolutions: [128] #, 1024] 
+    test_batch_sizes: [16] #, 1]
+    positional_encoding: True
+
+    encode_input: True
+    encode_output: False
+    num_workers: 0
+    pin_memory: False
+    persistent_workers: False
+
+  # Patching
+  patching:
+    levels: 0 #1
+    padding: 0 #0.078125
+    stitching: True
+
+  # Weights and biases
+  wandb:
+    log: True
+    name: 'debug on V100 GCP - loss printout' # If None, config will be used but you can override it here
+    group: '' 
+    project: "fno"
+    entity: "renbotu" # put your username here
+    sweep: False
+    log_output: True
+    log_test_interval: 1
+    save_interval: 1000
+
