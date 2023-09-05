@@ -1,20 +1,16 @@
-from .tfno import Lifting, Projection
 import torch.nn as nn
 import torch.nn.functional as F
 from functools import partialmethod
 import torch
-from .mlp import MLP
-from .spectral_convolution import FactorizedSpectralConv3d, FactorizedSpectralConv2d, FactorizedSpectralConv1d
-from .spectral_convolution import FactorizedSpectralConv
-from .skip_connections import skip_connection
-from .padding import DomainPadding
-from .fno_block import FNOBlocks,resample
-from .tfno import partialclass
-import numpy as np
-#this will be merged with the neural operator UNO
+from ..layers.mlp import MLP
+from ..layers.spectral_convolution import SpectralConv
+from ..layers.skip_connections import skip_connection
+from ..layers.padding import DomainPadding
+from ..layers.fno_block import FNOBlocks,resample
 
 class UNO(nn.Module):
-    """
+    """U-Shaped Neural Operator
+
     Parameters
     ----------
     in_channels : int, optional
@@ -112,7 +108,7 @@ class UNO(nn.Module):
                  rank=1.0,
                  joint_factorization=False, 
                  fixed_rank_modes=False,
-                 integral_operator=FactorizedSpectralConv,
+                 integral_operator=SpectralConv,
                  operator_block=FNOBlocks,
                  implementation='factorized',
                  decomposition_kwargs=dict(),
@@ -194,8 +190,7 @@ class UNO(nn.Module):
 
 
         
-
-        self.lifting = Projection(in_channels=in_channels, out_channels=self.hidden_channels, hidden_channels=self.lifting_channels, n_dim=self.n_dim)
+        self.lifting = MLP(in_channels=in_channels, out_channels=self.hidden_channels, hidden_channels=self.lifting_channels, n_layers=2, n_dim=self.n_dim) 
         self.fno_blocks = nn.ModuleList([])
         self.horizontal_skips = torch.nn.ModuleDict({})
         prev_out = self.hidden_channels
@@ -229,13 +224,12 @@ class UNO(nn.Module):
                                             joint_factorization=joint_factorization, normalizer=normalizer))
             
             if i in self.horizontal_skips_map.values():
-                self.horizontal_skips[str(i)]=skip_connection( self.uno_out_channels[i],\
-                self.uno_out_channels[i], type=horizontal_skip, n_dim=self.n_dim)
+                self.horizontal_skips[str(i)]=skip_connection(self.uno_out_channels[i], \
+                                                              self.uno_out_channels[i], skip_type=horizontal_skip, n_dim=self.n_dim)
 
             prev_out = self.uno_out_channels[i]
 
-        self.projection = Projection(in_channels=prev_out, out_channels=out_channels, hidden_channels=projection_channels,
-                                        non_linearity=non_linearity, n_dim=self.n_dim)
+        self.projection = MLP(in_channels=prev_out, out_channels=out_channels, hidden_channels=self.projection_channels, n_layers=2, n_dim=self.n_dim, non_linearity=non_linearity) 
      
     def forward(self, x):
         x = self.lifting(x)
