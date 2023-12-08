@@ -1,6 +1,7 @@
 import torch
 import opt_einsum
 import tensorly as tl
+import itertools
 tl.set_backend('pytorch')
 
 
@@ -29,8 +30,45 @@ def einsum_complexhalf_two_input(eq, a, b):
     res = torch.stack([tmp[0, 0, ...] - tmp[1, 1, ...], tmp[1, 0, ...] + tmp[0, 1, ...]], dim=-1)
     return torch.view_as_complex(res)
 
+def einsum_complexhalf_naive(eq, *args):
+    import itertools
+    assert eq == 'abcd,e,be,fe,ce,de->afcd', "Currently only implemented for this eqn"
+
+    tensors = []
+    for tensor in args:
+        tensor = torch.view_as_real(tensor)
+        tensor = tensor.half()
+        tensors.append(tensor)
+
+    new_eq = 'abcdu,ev,bew,fex,cey,dez->uvwxyzafcd'
+    tmp = torch.einsum(new_eq, *tensors)
+    temp_re = None
+    temp_im = None
+    for comb in itertools.product([0,1], repeat=6):
+        #comb = list(s)
+        even = (sum(comb) % 2 == 0)
+        parity = ((sum(comb) + .5001) // 2) % 2 == 0
+        to_add = tmp[comb[0], comb[1], comb[2], comb[3], comb[4], comb[5], ...]
+        if not parity:
+            to_add = -1 * to_add
+        if even:
+            if temp_re is None:
+                temp_re = to_add
+            temp_re += to_add
+        else:
+            if temp_im is None:
+                temp_im = to_add
+            temp_im += to_add
+
+    result = torch.stack([temp_re, temp_im], dim=-1)
+    return torch.view_as_complex(result)
+
 def einsum_complexhalf(eq, *args):
     """Compute einsum for complexhalf tensors"""
+    naive = True
+    if naive:
+        return einsum_complexhalf_naive(eq, *args)
+
     optimized = True
     if optimized:
         return einsum_complexhalf_optimized(eq, *args)
